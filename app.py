@@ -169,7 +169,7 @@ if 'data' in st.session_state:
     with col3:
         search = st.text_input("Search Dish Name")
 
-    filtered_df = filter_data(df, rest_filter, meal_filter, search, date_range)
+    filtered_df = filter_data(df, rest_filter, meal_filter, search)
     st.dataframe(filtered_df)
 
     # --- Show images ---
