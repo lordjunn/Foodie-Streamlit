@@ -124,9 +124,6 @@ def filter_data(df, restaurants, meal_types, search, date_range):
         filtered_df = filtered_df[filtered_df['meal_type'].isin(meal_types)]
     if search:
         filtered_df = filtered_df[filtered_df['dish_name'].str.contains(search, case=False, na=False)]
-    if date_range:
-        start_date, end_date = date_range
-        filtered_df = filtered_df[(filtered_df['date'] >= start_date) & (filtered_df['date'] <= end_date)]
     return filtered_df
 
 def show_images(df):
@@ -171,11 +168,6 @@ if 'data' in st.session_state:
         meal_filter = st.multiselect("Filter by Meal Type", sorted(df['meal_type'].unique().tolist()))
     with col3:
         search = st.text_input("Search Dish Name")
-    with col4:
-        df_dates = df[df['date'].notna()]
-        min_date = df_dates['date'].min().date()
-        max_date = df_dates['date'].max().date()
-        date_range = st.date_input("Date Range", [min_date, max_date], min_value=min_date, max_value=max_date)
 
     filtered_df = filter_data(df, rest_filter, meal_filter, search, date_range)
     st.dataframe(filtered_df)
