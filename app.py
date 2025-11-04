@@ -261,7 +261,7 @@ if 'data' in st.session_state:
             st.subheader("Price Distribution Histogram")
             numeric_prices = filtered_df['numeric_price'].dropna()
             fig_hist = px.histogram(numeric_prices, nbins=20, opacity=0.7, marginal=None)
-            fig_hist.update_traces(name='Prices', marker_color='blue', histnorm='count')
+            fig_hist.update_traces(name='Prices', marker_color='blue')
 
             # Normal curve overlay
             mean, std = numeric_prices.mean(), numeric_prices.std()
@@ -270,7 +270,7 @@ if 'data' in st.session_state:
             y_vals = norm.pdf(x_vals, mean, std) * len(numeric_prices) * bin_width
 
             fig_hist.add_scatter(x=x_vals, y=y_vals, mode='lines', line=dict(color='red'), name='Normal Curve')
-            st.plotly_chart(fig_hist, use_container_width=True)
+            st.plotly_chart(fig_hist, width='stretch')
 
             # --- Prices Over Time ---
             st.subheader("📅 Prices Over Time")
