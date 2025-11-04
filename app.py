@@ -65,7 +65,6 @@ def scrape_data(years, months):
 
     for url in urls:
         count += 1
-        st.info(f"Scraping URL: {url}")
         progress.progress(count / total)
         try:
             response = requests.get(url)
@@ -173,8 +172,9 @@ if 'data' in st.session_state:
     with col3:
         search = st.text_input("Search Dish Name")
     with col4:
-        min_date = df['date'].min()
-        max_date = df['date'].max()
+        df_dates = df[df['date'].notna()]
+        min_date = df_dates['date'].min().date()
+        max_date = df_dates['date'].max().date()
         date_range = st.date_input("Date Range", [min_date, max_date], min_value=min_date, max_value=max_date)
 
     filtered_df = filter_data(df, rest_filter, meal_filter, search, date_range)
