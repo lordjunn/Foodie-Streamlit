@@ -185,7 +185,13 @@ if 'data' in st.session_state:
         # Scatterplot with regression
         st.subheader("Scatter Plot with Regression Line")
         df_time = filtered_df.copy()
-        df_time['date'] = pd.to_datetime(df_time['date'], errors='coerce')
+        # Clean up and convert dates
+        df_time['date'] = (
+            df_time['date']
+            .str.replace(r"\s*\(.*?\)", "", regex=True)  # remove "(Wednesday)" part
+            .str.strip()
+            .pipe(pd.to_datetime, format="%d %b %Y", errors='coerce')
+        )
         df_time = df_time.dropna(subset=['date', 'numeric_price'])
         if not df_time.empty:
             fig3, ax3 = plt.subplots()
