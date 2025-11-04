@@ -90,8 +90,7 @@ def scrape_data(years, months):
                     date_obj = parser.parse(date_str, dayfirst=True)
                 except Exception as e:
                     st.warning(f"Failed to parse date '{date_str}' in {url}: {e}")
-                    date_obj = date_str  # fallback to string
-
+                    
                 # --- Parse menu items ---
                 menu_group = menu_div.find('div', class_='menu-group')
                 if not menu_group:
@@ -259,21 +258,17 @@ if 'data' in st.session_state:
 
             # --- Histogram with Normal Overlay ---
             st.subheader("Price Distribution Histogram")
+            numeric_prices = filtered_df['numeric_price'].dropna()
+            fig_hist = px.histogram(numeric_prices, nbins=20, opacity=0.7, marginal=None)
+            fig_hist.update_traces(name='Prices', marker_color='blue', histnorm='count')
+
+            # Normal curve overlay
             mean, std = numeric_prices.mean(), numeric_prices.std()
-            hist_data = [numeric_prices]
-            group_labels = ['Prices']
-            fig_hist = ff.create_distplot(hist_data, group_labels, show_hist=True, show_rug=False)
-            x_vals = np.linspace(mean - 3*std, mean + 3*std, 100)
-            y_vals = stats.norm.pdf(x_vals, mean, std)
-            # Scale PDF to match histogram counts
-            y_vals_scaled = y_vals * len(numeric_prices) * (numeric_prices.max() - numeric_prices.min()) / 15
-            fig_hist.add_scatter(
-                x=x_vals, 
-                y=y_vals_scaled, 
-                mode='lines', 
-                name='Normal Curve', 
-                line=dict(color='red')
-            )
+            x_vals = np.linspace(numeric_prices.min(), numeric_prices.max(), 200)
+            bin_width = (numeric_prices.max() - numeric_prices.min()) / 20
+            y_vals = norm.pdf(x_vals, mean, std) * len(numeric_prices) * bin_width
+
+            fig_hist.add_scatter(x=x_vals, y=y_vals, mode='lines', line=dict(color='red'), name='Normal Curve')
             st.plotly_chart(fig_hist, use_container_width=True)
 
             # --- Prices Over Time ---
