@@ -68,22 +68,26 @@ def scrape_data(years, months):
         progress.progress(count / total)
         try:
             response = requests.get(url)
-            if response.status_code != 200:
-                continue
-            soup = BeautifulSoup(response.text, 'html.parser')
 
-            for menu_div in soup.find_all('div', class_='menu'):
+            soup = BeautifulSoup(response.text, 'html.parser')
+            menu_divs = soup.find_all('div', class_='menu')
+
+            # Skip the last menu div (end-of-month summary)
+            if len(menu_divs) > 1:
+                menu_divs = menu_divs[:-1]
+
+            for menu_div in menu_divs:
                 # --- Parse the date ---
                 date_heading = menu_div.find('h2', class_='menu-group-heading')
+                date_obj = None
                 if date_heading:
                     date_str = date_heading.text.strip()
+                    # Remove anything in parentheses
+                    date_str = re.sub(r'\s*\(.*?\)', '', date_str)
                     try:
-                        # Use dateutil.parser for robustness
                         date_obj = parser.parse(date_str, dayfirst=True)
-                    except:
-                        date_obj = None
-                else:
-                    date_obj = None
+                    except Exception as e:
+                        st.warning(f"Failed to parse date '{date_str}' in {url}: {e}")
 
                 # --- Parse menu items ---
                 menu_group = menu_div.find('div', class_='menu-group')
