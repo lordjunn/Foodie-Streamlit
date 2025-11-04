@@ -229,7 +229,7 @@ if 'data' in st.session_state:
                     hover_data=['dish_name', 'restaurant_name']
                 )
                 fig_box.update_layout(xaxis_title="Meal Category", yaxis_title="Price")
-                st.plotly_chart(fig_box, use_container_width=True)
+                st.plotly_chart(fig_box, width='stretch')
 
             # --- QQ Plot ---
             with colB:
@@ -255,7 +255,7 @@ if 'data' in st.session_state:
                     line=dict(color="red", dash="dash")
                 )
                 fig_qq.update_layout(xaxis_title="Theoretical Quantiles", yaxis_title="Sample Quantiles")
-                st.plotly_chart(fig_qq, use_container_width=True)
+                st.plotly_chart(fig_qq, width='stretch')
 
             # --- Histogram with Normal Overlay ---
             st.subheader("Price Distribution Histogram")
@@ -275,25 +275,33 @@ if 'data' in st.session_state:
             # --- Prices Over Time ---
             st.subheader("📅 Prices Over Time")
             filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
-            time_df = filtered_df.dropna(subset=['numeric_price', 'date'])
+            time_df = filtered_df.dropna(subset=['numeric_price', 'date']).copy()
 
-            if not time_df.empty:
-                fig_time = px.scatter(
-                    time_df,
-                    x='date',
-                    y='numeric_price',
-                    color='meal_category',
-                    hover_data=['dish_name', 'restaurant_name'],
-                    trendline='lowess',
-                    title="Food Prices Over Time"
-                )
-                fig_time.update_layout(
-                    xaxis_title="Date",
-                    yaxis_title="Price",
-                    legend_title="Meal Type"
-                )
-                st.plotly_chart(fig_time, use_container_width=True)
-
+            if time_df.empty:
+                st.warning("No valid data for 'Prices Over Time' plot.")
+            else:
+                # Ensure numeric_price is float
+                time_df['numeric_price'] = pd.to_numeric(time_df['numeric_price'], errors='coerce')
+                time_df = time_df.dropna(subset=['numeric_price'])
+                
+                if len(time_df) < 2:
+                    st.warning("Not enough data points to plot 'Prices Over Time'.")
+                else:
+                    fig_time = px.scatter(
+                        time_df,
+                        x='date',
+                        y='numeric_price',
+                        color='meal_category',
+                        hover_data=['dish_name', 'restaurant_name'],
+                        trendline='lowess',
+                        title="Food Prices Over Time"
+                    )
+                    fig_time.update_layout(
+                        xaxis_title="Date",
+                        yaxis_title="Price",
+                        legend_title="Meal Type"
+                    )
+                    st.plotly_chart(fig_time, width='stretch')
 
 else:
     st.info("👈 Start by scraping some data first!")
