@@ -142,22 +142,55 @@ if 'data' in st.session_state:
     st.dataframe(filtered_df)
 
     # ---------- STATISTICS ----------
-    st.subheader("📊 Quantitative Summary (Price Statistics)")
+    st.subheader("📊 Quantitative Summary (by Meal Type)")
+
     if 'numeric_price' in filtered_df.columns:
-        numeric_data = filtered_df['numeric_price'].dropna()
-        if not numeric_data.empty:
-            stats_df = pd.DataFrame({
-                'Mean': [numeric_data.mean()],
-                'Median': [numeric_data.median()],
-                'Min': [numeric_data.min()],
-                'Max': [numeric_data.max()],
-                'Variance': [numeric_data.var()],
-                'Std Dev': [numeric_data.std()],
-                'Count': [numeric_data.count()]
-            })
-            st.dataframe(stats_df)
+        df_stats = filtered_df.dropna(subset=['numeric_price']).copy()
+
+        if not df_stats.empty:
+            # Normalize meal type: pick the first word match (breakfast/lunch/dinner/other)
+            def normalize_meal_type(x):
+                x_lower = x.lower()
+                if "breakfast" in x_lower:
+                    return "Breakfast"
+                elif "lunch" in x_lower:
+                    return "Lunch"
+                elif "dinner" in x_lower:
+                    return "Dinner"
+                else:
+                    return "Other"
+
+            df_stats['meal_category'] = df_stats['meal_type'].apply(normalize_meal_type)
+
+            # Compute grouped summary
+            grouped_stats = (
+                df_stats.groupby('meal_category')['numeric_price']
+                .agg(['mean', 'median', 'min', 'max', 'var', 'std', 'count'])
+                .rename(columns={
+                    'mean': 'Mean', 'median': 'Median', 'min': 'Min', 'max': 'Max',
+                    'var': 'Variance', 'std': 'Std Dev', 'count': 'Count'
+                })
+            )
+
+            # Add a grand total row
+            total_stats = pd.DataFrame({
+                'Mean': [df_stats['numeric_price'].mean()],
+                'Median': [df_stats['numeric_price'].median()],
+                'Min': [df_stats['numeric_price'].min()],
+                'Max': [df_stats['numeric_price'].max()],
+                'Variance': [df_stats['numeric_price'].var()],
+                'Std Dev': [df_stats['numeric_price'].std()],
+                'Count': [df_stats['numeric_price'].count()]
+            }, index=['🍽️ Grand Total'])
+
+            full_stats = pd.concat([grouped_stats, total_stats])
+            st.dataframe(full_stats.style.format({
+                'Mean': '{:.2f}', 'Median': '{:.2f}', 'Min': '{:.2f}',
+                'Max': '{:.2f}', 'Variance': '{:.2f}', 'Std Dev': '{:.2f}', 'Count': '{:,.0f}'
+            }))
         else:
-            st.info("No numeric price data available.")
+            st.info("No numeric price data available for summary.")
+
 
     # ---------- CHARTS ----------
     st.header("📈 Visualizations")
