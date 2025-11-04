@@ -200,14 +200,29 @@ if 'data' in st.session_state:
 
         # Box Plot
         with colA:
-            st.subheader("Box Plot: Price by Meal Type")
-            fig, ax = plt.subplots()
-            sns.boxplot(x='meal_type', y='numeric_price', data=filtered_df, ax=ax, palette="pastel")
-            ax.set_xlabel("Meal Type")
-            ax.set_ylabel("Price")
-            plt.xticks(rotation=45)
-            st.pyplot(fig)
+            st.subheader("Box Plot: Price by Normalized Meal Category")
 
+            # Normalize meal type again
+            def normalize_meal_type(x):
+                x_lower = x.lower()
+                if "breakfast" in x_lower:
+                    return "Breakfast"
+                elif "lunch" in x_lower:
+                    return "Lunch"
+                elif "dinner" in x_lower:
+                    return "Dinner"
+                else:
+                    return "Other"
+
+            filtered_df['meal_category'] = filtered_df['meal_type'].apply(normalize_meal_type)
+
+            fig_box, ax_box = plt.subplots()
+            sns.boxplot(x='meal_category', y='numeric_price', data=filtered_df, ax=ax_box, palette="Set3")
+            ax_box.set_xlabel("Meal Category")
+            ax_box.set_ylabel("Price")
+            plt.xticks(rotation=45)
+            st.pyplot(fig_box)
+        
         # QQ Plot
         with colB:
             st.subheader("QQ Plot (Normality Check)")
@@ -216,26 +231,23 @@ if 'data' in st.session_state:
             st.pyplot(fig2)
 
         # Scatterplot with regression
-        st.subheader("Scatter Plot with Regression Line")
-        df_time = filtered_df.copy()
-        # Clean up and convert dates
-        df_time['date'] = (
-            df_time['date']
-            .str.replace(r"\s*\(.*?\)", "", regex=True)  # remove "(Wednesday)" part
-            .str.strip()
-            .pipe(pd.to_datetime, format="%d %b %Y", errors='coerce')
-        )
-        df_time = df_time.dropna(subset=['date', 'numeric_price'])
-        if not df_time.empty:
-            fig3, ax3 = plt.subplots()
-            sns.regplot(x=df_time['date'].map(pd.Timestamp.toordinal),
-                        y='numeric_price', data=df_time,
-                        scatter_kws={'alpha':0.6}, line_kws={'color':'red'}, ax=ax3)
-            ax3.set_xlabel("Date (ordinal)")
-            ax3.set_ylabel("Price")
-            st.pyplot(fig3)
+        st.subheader("Price Distribution Histogram (with Normal Curve)")
+
+        numeric_prices = filtered_df['numeric_price'].dropna()
+        if not numeric_prices.empty:
+            fig_hist, ax_hist = plt.subplots()
+            sns.histplot(numeric_prices, bins=15, kde=True, color='skyblue', stat='density', ax=ax_hist)
+            # Overlay a normal curve using mean & std
+            mean = numeric_prices.mean()
+            std = numeric_prices.std()
+            x_vals = np.linspace(mean - 3*std, mean + 3*std, 100)
+            y_vals = stats.norm.pdf(x_vals, mean, std)
+            ax_hist.plot(x_vals, y_vals, color='red', linewidth=2)
+            ax_hist.set_xlabel("Price")
+            ax_hist.set_ylabel("Density")
+            st.pyplot(fig_hist)
         else:
-            st.info("Not enough valid date/price data for scatter plot.")
+            st.info("No numeric price data for histogram.")
     else:
         st.info("No numeric price data to visualize — try different filters.")
 else:
