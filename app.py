@@ -9,6 +9,8 @@ import seaborn as sns
 from scipy import stats
 from datetime import datetime
 from dateutil import parser
+import plotly.express as px
+import plotly.figure_factory as ff
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="🍜 MMU Food Log Scraper & Data Explorer", layout="wide")
@@ -205,56 +207,97 @@ if 'data' in st.session_state:
         }))
 
     # --- Visualizations ---
-    st.header("📈 Visualizations")
+    st.header("📈 Interactive Visualizations")
+
     if not filtered_df.empty and 'numeric_price' in filtered_df.columns:
-        colA, colB = st.columns(2)
         filtered_df['meal_category'] = filtered_df['meal_type'].apply(normalize_meal_type)
-
-        # Box Plot
-        with colA:
-            st.subheader("Box Plot: Price by Meal Category")
-            fig_box, ax_box = plt.subplots()
-            sns.boxplot(x='meal_category', y='numeric_price', data=filtered_df.dropna(subset=['numeric_price']), ax=ax_box, palette="Set3")
-            ax_box.set_xlabel("Meal Category")
-            ax_box.set_ylabel("Price")
-            plt.xticks(rotation=45)
-            st.pyplot(fig_box)
-
-        # QQ Plot
-        with colB:
-            st.subheader("QQ Plot (Normality Check)")
-            fig_qq = plt.figure()
-            stats.probplot(filtered_df['numeric_price'].dropna(), dist="norm", plot=plt)
-            st.pyplot(fig_qq)
-
-        # Histogram with normal overlay (raw counts)
-        st.subheader("Price Distribution Histogram")
         numeric_prices = filtered_df['numeric_price'].dropna()
 
         if not numeric_prices.empty:
-            fig_hist, ax_hist = plt.subplots()
+            # --- Box Plot & QQ Plot side by side ---
+            colA, colB = st.columns(2)
 
-            # Plot histogram with raw counts
-            sns.histplot(numeric_prices, bins=15, kde=False, color='skyblue', stat='count', ax=ax_hist)
+            # --- Box Plot ---
+            with colA:
+                st.subheader("Box Plot: Price by Meal Category")
+                fig_box = px.box(
+                    filtered_df, 
+                    x='meal_category', 
+                    y='numeric_price',
+                    color='meal_category', 
+                    points="all",
+                    hover_data=['dish_name', 'restaurant_name']
+                )
+                fig_box.update_layout(xaxis_title="Meal Category", yaxis_title="Price")
+                st.plotly_chart(fig_box, use_container_width=True)
 
-            # Calculate mean and std
+            # --- QQ Plot ---
+            with colB:
+                st.subheader("QQ Plot (Normality Check)")
+                sorted_prices = np.sort(numeric_prices)
+                theoretical_quantiles = np.sort(np.random.normal(numeric_prices.mean(), numeric_prices.std(), len(sorted_prices)))
+                qq_df = pd.DataFrame({
+                    "Theoretical Quantiles": theoretical_quantiles,
+                    "Sample Quantiles": sorted_prices
+                })
+                fig_qq = px.scatter(
+                    qq_df, 
+                    x="Theoretical Quantiles", 
+                    y="Sample Quantiles",
+                    hover_data=[qq_df.index]
+                )
+                fig_qq.add_shape(
+                    type="line",
+                    x0=qq_df["Theoretical Quantiles"].min(),
+                    y0=qq_df["Theoretical Quantiles"].min(),
+                    x1=qq_df["Theoretical Quantiles"].max(),
+                    y1=qq_df["Theoretical Quantiles"].max(),
+                    line=dict(color="red", dash="dash")
+                )
+                fig_qq.update_layout(xaxis_title="Theoretical Quantiles", yaxis_title="Sample Quantiles")
+                st.plotly_chart(fig_qq, use_container_width=True)
+
+            # --- Histogram with Normal Overlay ---
+            st.subheader("Price Distribution Histogram")
             mean, std = numeric_prices.mean(), numeric_prices.std()
-
-            # Create x values for normal curve
+            hist_data = [numeric_prices]
+            group_labels = ['Prices']
+            fig_hist = ff.create_distplot(hist_data, group_labels, show_hist=True, show_rug=False)
             x_vals = np.linspace(mean - 3*std, mean + 3*std, 100)
+            y_vals = stats.norm.pdf(x_vals, mean, std)
+            # Scale PDF to match histogram counts
+            y_vals_scaled = y_vals * len(numeric_prices) * (numeric_prices.max() - numeric_prices.min()) / 15
+            fig_hist.add_scatter(
+                x=x_vals, 
+                y=y_vals_scaled, 
+                mode='lines', 
+                name='Normal Curve', 
+                line=dict(color='red')
+            )
+            st.plotly_chart(fig_hist, use_container_width=True)
 
-            # Scale normal PDF to histogram counts
-            bin_width = (numeric_prices.max() - numeric_prices.min()) / 15  # same as histogram bins
-            y_vals = stats.norm.pdf(x_vals, mean, std) * len(numeric_prices) * bin_width
+            # --- Prices Over Time ---
+            st.subheader("📅 Prices Over Time")
+            filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
+            time_df = filtered_df.dropna(subset=['numeric_price', 'date'])
 
-            # Plot normal curve
-            ax_hist.plot(x_vals, y_vals, color='red', linewidth=2)
+            if not time_df.empty:
+                fig_time = px.scatter(
+                    time_df,
+                    x='date',
+                    y='numeric_price',
+                    color='meal_category',
+                    hover_data=['dish_name', 'restaurant_name'],
+                    trendline='lowess',
+                    title="Food Prices Over Time"
+                )
+                fig_time.update_layout(
+                    xaxis_title="Date",
+                    yaxis_title="Price",
+                    legend_title="Meal Type"
+                )
+                st.plotly_chart(fig_time, use_container_width=True)
 
-            # Labels
-            ax_hist.set_xlabel("Price")
-            ax_hist.set_ylabel("Count")
-
-            st.pyplot(fig_hist)
 
 else:
     st.info("👈 Start by scraping some data first!")
