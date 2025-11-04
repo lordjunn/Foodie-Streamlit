@@ -116,7 +116,7 @@ def scrape_data(years, months):
     return pd.DataFrame(menu_items)
 
 # ---------- FILTER & EXPLORE ----------
-def filter_data(df, restaurants, meal_types, search, date_range):
+def filter_data(df, restaurants, meal_types, search):
     filtered_df = df.copy()
     if restaurants:
         filtered_df = filtered_df[filtered_df['restaurant_name'].isin(restaurants)]
