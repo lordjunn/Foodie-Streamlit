@@ -11,6 +11,7 @@ from datetime import datetime
 from dateutil import parser
 import plotly.express as px
 import plotly.figure_factory as ff
+from scipy.stats import norm
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="🍜 MMU Food Log Scraper & Data Explorer", layout="wide")
