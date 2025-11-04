@@ -101,7 +101,7 @@ def scrape_data(years, months):
                         'restaurant_name': restaurant_name,
                         'price': price.text.strip() if price else 'No price',
                         'numeric_price': parse_price(price.text.strip() if price else None),
-                        'meal_type': meal_type.text.strip() if meal_type else 'No meal type',
+                        'meal_type': normalize_meal_type(meal_type.text.strip()) if meal_type else 'No meal type',
                         'description': preserve_inline_html(description),
                     })
         except Exception as e:
@@ -215,18 +215,34 @@ if 'data' in st.session_state:
             stats.probplot(filtered_df['numeric_price'].dropna(), dist="norm", plot=plt)
             st.pyplot(fig_qq)
 
-        # Histogram with normal overlay
+        # Histogram with normal overlay (raw counts)
         st.subheader("Price Distribution Histogram")
         numeric_prices = filtered_df['numeric_price'].dropna()
+
         if not numeric_prices.empty:
             fig_hist, ax_hist = plt.subplots()
-            sns.histplot(numeric_prices, bins=15, kde=True, color='skyblue', stat='density', ax=ax_hist)
+
+            # Plot histogram with raw counts
+            sns.histplot(numeric_prices, bins=15, kde=False, color='skyblue', stat='count', ax=ax_hist)
+
+            # Calculate mean and std
             mean, std = numeric_prices.mean(), numeric_prices.std()
+
+            # Create x values for normal curve
             x_vals = np.linspace(mean - 3*std, mean + 3*std, 100)
-            y_vals = stats.norm.pdf(x_vals, mean, std)
+
+            # Scale normal PDF to histogram counts
+            bin_width = (numeric_prices.max() - numeric_prices.min()) / 15  # same as histogram bins
+            y_vals = stats.norm.pdf(x_vals, mean, std) * len(numeric_prices) * bin_width
+
+            # Plot normal curve
             ax_hist.plot(x_vals, y_vals, color='red', linewidth=2)
+
+            # Labels
             ax_hist.set_xlabel("Price")
-            ax_hist.set_ylabel("Density")
+            ax_hist.set_ylabel("Count")
+
             st.pyplot(fig_hist)
+
 else:
     st.info("👈 Start by scraping some data first!")
