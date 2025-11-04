@@ -8,6 +8,7 @@ import matplotlib.pyplot as plt
 import seaborn as sns
 from scipy import stats
 from datetime import datetime
+from dateutil import parser
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="🍜 MMU Food Log Scraper & Data Explorer", layout="wide")
@@ -68,21 +69,23 @@ def scrape_data(years, months):
         try:
             response = requests.get(url)
             if response.status_code != 200:
-                st.warning(f"Failed to fetch {url}")
                 continue
             soup = BeautifulSoup(response.text, 'html.parser')
+
             for menu_div in soup.find_all('div', class_='menu'):
+                # --- Parse the date ---
                 date_heading = menu_div.find('h2', class_='menu-group-heading')
-                if not date_heading:
-                    continue
-                date_str = date_heading.text.strip()
-                if 'spendings' in date_str.lower():
-                    continue
-                try:
-                    date_obj = datetime.strptime(date_str, "%d %b %y")
-                except:
+                if date_heading:
+                    date_str = date_heading.text.strip()
+                    try:
+                        # Use dateutil.parser for robustness
+                        date_obj = parser.parse(date_str, dayfirst=True)
+                    except:
+                        date_obj = None
+                else:
                     date_obj = None
 
+                # --- Parse menu items ---
                 menu_group = menu_div.find('div', class_='menu-group')
                 if not menu_group:
                     continue
@@ -92,9 +95,11 @@ def scrape_data(years, months):
                     if not name or not name.text.strip():
                         continue
                     dish_name, restaurant_name = split_dish_and_restaurant(name.text)
+
                     price = item.find('span', class_='menu-item-price')
                     meal_type = item.find('span', class_='meal-type')
                     description = item.find('p', class_='menu-item-description')
+
                     menu_items.append({
                         'date': date_obj,
                         'dish_name': dish_name,
@@ -104,6 +109,7 @@ def scrape_data(years, months):
                         'meal_type': normalize_meal_type(meal_type.text.strip()) if meal_type else 'No meal type',
                         'description': preserve_inline_html(description),
                     })
+
         except Exception as e:
             st.error(f"Error scraping {url}: {e}")
 
@@ -123,7 +129,7 @@ def filter_data(df, restaurants, meal_types, search):
     return filtered_df
 
 # ---------- APP ----------
-st.title("🍜 MMU Food Log Scraper & Data Science Explorer")
+st.title("🍜 Junn Food Log Scraper & Data Science Explorer")
 
 # --- Sidebar: Scraping Settings ---
 st.sidebar.header("Scrape Settings")
