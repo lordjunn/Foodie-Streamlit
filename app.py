@@ -310,17 +310,18 @@ if 'data' in st.session_state:
 
             # --- LOWESS Monthly Summary per Meal Type (clean layout) ---
             st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
-            
-            # Identify LOWESS trendline traces more robustly
-            
-            # Identify LOWESS traces properly
+
             lowess_traces = [t for t in fig_time.data if getattr(t, "mode", None) == "lines"]
 
             if len(lowess_traces) == 0:
                 st.info("No LOWESS trendlines found — try enabling trendline='lowess' in the plot.")
             else:
+                # Make pairs of columns (2x2 layout)
+                cols = st.columns(2)
+                col_index = 0
+
                 for trace in lowess_traces:
-                    # Extract meal type name (e.g., "Breakfast (lowess)" → "Breakfast")
+                    # Extract meal type
                     meal_type = trace.name.replace("(lowess)", "").strip()
                     lowess_x = pd.to_datetime(trace.x)
                     lowess_y = trace.y
@@ -331,7 +332,6 @@ if 'data' in st.session_state:
                     })
                     lowess_df['year_month'] = lowess_df['date'].dt.to_period('M').astype(str)
 
-                    # Monthly stats
                     monthly_summary = lowess_df.groupby('year_month')['lowess_price'].agg(
                         ['min', 'max', 'mean']
                     ).rename(columns={
@@ -340,30 +340,34 @@ if 'data' in st.session_state:
                         'mean': 'LOWESS Avg'
                     }).round(2)
 
-                    # Month-over-month deltas
                     monthly_summary['Δ Avg'] = monthly_summary['LOWESS Avg'].diff().round(2)
                     monthly_summary['% Change Avg'] = (
                         monthly_summary['LOWESS Avg'].pct_change() * 100
                     ).round(2)
 
-                    # Conditional coloring for Δ columns
                     def highlight_change(val):
                         if pd.isna(val):
                             return ''
                         color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
                         return f'color: {color}; font-weight: bold;'
 
-                    # Section header for meal type
-                    st.markdown(f"### 🍽️ {meal_type}")
-                    st.dataframe(
-                        monthly_summary.style.format({
-                            'LOWESS Min': '{:.2f}',
-                            'LOWESS Max': '{:.2f}',
-                            'LOWESS Avg': '{:.2f}',
-                            'Δ Avg': '{:+.2f}',
-                            '% Change Avg': '{:+.2f}%'
-                        }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
-                    )
+                    # Use the current column
+                    with cols[col_index]:
+                        st.markdown(f"### 🍽️ {meal_type}")
+                        st.dataframe(
+                            monthly_summary.style.format({
+                                'LOWESS Min': '{:.2f}',
+                                'LOWESS Max': '{:.2f}',
+                                'LOWESS Avg': '{:.2f}',
+                                'Δ Avg': '{:+.2f}',
+                                '% Change Avg': '{:+.2f}%'
+                            }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                        )
+
+                    # Alternate between left (0) and right (1) column
+                    col_index = (col_index + 1) % 2
+                    if col_index == 0:
+                        cols = st.columns(2)  # Start a new row of 2 columns
 
 
 else:
