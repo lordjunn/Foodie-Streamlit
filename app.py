@@ -85,13 +85,19 @@ def scrape_data(years, months):
                 date_obj = None
                 if date_heading:
                     date_str = date_heading.text.strip()
-                    # remove extra text in parentheses, e.g., "03 Nov 2025 (Monday)"
-                    date_str = re.sub(r'\s*\(.*?\)', '', date_str)
-                try:
-                    date_obj = parser.parse(date_str, dayfirst=True)
-                except Exception as e:
-                    st.warning(f"Failed to parse date '{date_str}' in {url}: {e}")
                     
+                    # Only parse if it looks like a proper date
+                    if re.match(r'\d{1,2}\s+\w+\s+\d{4}', date_str):
+                        # remove extra text in parentheses, e.g., "03 Nov 2025 (Monday)"
+                        date_str = re.sub(r'\s*\(.*?\)', '', date_str)
+                        try:
+                            date_obj = parser.parse(date_str, dayfirst=True)
+                        except Exception as e:
+                            st.warning(f"Failed to parse date '{date_str}' in {url}: {e}")
+                    else:
+                        st.warning(f"Skipped non-date heading '{date_str}' in {url}")
+                        continue  # skip this menu_div entirely
+
                 # --- Parse menu items ---
                 menu_group = menu_div.find('div', class_='menu-group')
                 if not menu_group:
