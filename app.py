@@ -95,7 +95,6 @@ def scrape_data(years, months):
                         except Exception as e:
                             st.warning(f"Failed to parse date '{date_str}' in {url}: {e}")
                     else:
-                        st.warning(f"Skipped non-date heading '{date_str}' in {url}")
                         continue  # skip this menu_div entirely
 
                 # --- Parse menu items ---
