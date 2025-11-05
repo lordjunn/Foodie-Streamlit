@@ -310,11 +310,11 @@ if 'data' in st.session_state:
 
             # --- LOWESS Monthly Summary per Meal Type (clean layout) ---
             st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
-
-            lowess_traces = [
-                trace for trace in fig_time.data
-                if 'lowess' in trace.name.lower()  # only keep LOWESS trend lines
-            ]
+            
+            # Identify LOWESS trendline traces more robustly
+            
+            # Identify LOWESS traces properly
+            lowess_traces = [t for t in fig_time.data if getattr(t, "mode", None) == "lines"]
 
             if len(lowess_traces) == 0:
                 st.info("No LOWESS trendlines found — try enabling trendline='lowess' in the plot.")
