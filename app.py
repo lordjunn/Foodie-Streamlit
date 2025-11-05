@@ -14,7 +14,7 @@ import plotly.figure_factory as ff
 from scipy.stats import norm
 
 # ---------- CONFIG ----------
-st.set_page_config(page_title="🍜 MMU Food Log Scraper & Data Explorer", layout="wide")
+st.set_page_config(page_title="🍜 Junn Food Log Scraper & Data Explorer", layout="wide")
 sns.set_theme(style="whitegrid")
 
 # ---------- UTILS ----------
@@ -307,6 +307,64 @@ if 'data' in st.session_state:
                         legend_title="Meal Type"
                     )
                     st.plotly_chart(fig_time, width='stretch')
+
+            # --- LOWESS Monthly Summary per Meal Type (clean layout) ---
+            st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
+
+            lowess_traces = [
+                trace for trace in fig_time.data
+                if 'lowess' in trace.name.lower()  # only keep LOWESS trend lines
+            ]
+
+            if len(lowess_traces) == 0:
+                st.info("No LOWESS trendlines found — try enabling trendline='lowess' in the plot.")
+            else:
+                for trace in lowess_traces:
+                    # Extract meal type name (e.g., "Breakfast (lowess)" → "Breakfast")
+                    meal_type = trace.name.replace("(lowess)", "").strip()
+                    lowess_x = pd.to_datetime(trace.x)
+                    lowess_y = trace.y
+
+                    lowess_df = pd.DataFrame({
+                        'date': lowess_x,
+                        'lowess_price': lowess_y
+                    })
+                    lowess_df['year_month'] = lowess_df['date'].dt.to_period('M').astype(str)
+
+                    # Monthly stats
+                    monthly_summary = lowess_df.groupby('year_month')['lowess_price'].agg(
+                        ['min', 'max', 'mean']
+                    ).rename(columns={
+                        'min': 'LOWESS Min',
+                        'max': 'LOWESS Max',
+                        'mean': 'LOWESS Avg'
+                    }).round(2)
+
+                    # Month-over-month deltas
+                    monthly_summary['Δ Avg'] = monthly_summary['LOWESS Avg'].diff().round(2)
+                    monthly_summary['% Change Avg'] = (
+                        monthly_summary['LOWESS Avg'].pct_change() * 100
+                    ).round(2)
+
+                    # Conditional coloring for Δ columns
+                    def highlight_change(val):
+                        if pd.isna(val):
+                            return ''
+                        color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+                        return f'color: {color}; font-weight: bold;'
+
+                    # Section header for meal type
+                    st.markdown(f"### 🍽️ {meal_type}")
+                    st.dataframe(
+                        monthly_summary.style.format({
+                            'LOWESS Min': '{:.2f}',
+                            'LOWESS Max': '{:.2f}',
+                            'LOWESS Avg': '{:.2f}',
+                            'Δ Avg': '{:+.2f}',
+                            '% Change Avg': '{:+.2f}%'
+                        }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                    )
+
 
 else:
     st.info("👈 Start by scraping some data first!")
