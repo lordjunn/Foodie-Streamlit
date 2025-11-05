@@ -169,20 +169,47 @@ if scrape_button:
 # --- Data Explorer ---
 st.header("📋 Data Explorer")
 if 'data' in st.session_state:
-    df = st.session_state['data']
+    df = st.session_state['data'].copy()
+    
+    # Ensure date column is datetime
+    df['date'] = pd.to_datetime(df['date'], errors='coerce')
 
-    # --- Filters ---
-    col1, col2, col3 = st.columns(3)
+    # --- Filters in 4 columns ---
+    col1, col2, col3, col4 = st.columns([2,2,2,3])  # Adjust widths for better layout
     with col1:
-        rest_filter = st.multiselect("Filter by Restaurant", sorted(df['restaurant_name'].unique().tolist()))
+        rest_filter = st.multiselect(
+            "Filter by Restaurant", 
+            options=sorted(df['restaurant_name'].dropna().unique().tolist())
+        )
     with col2:
-        meal_filter = st.multiselect("Filter by Meal Type", sorted(df['meal_type'].unique().tolist()))
+        meal_filter = st.multiselect(
+            "Filter by Meal Type", 
+            options=sorted(df['meal_type'].dropna().unique().tolist())
+        )
     with col3:
         search = st.text_input("Search Dish Name")
+    with col4:
+        min_date = df['date'].min()
+        max_date = df['date'].max()
+        date_range = st.date_input(
+            "Filter by Date",
+            value=(min_date, max_date),
+            min_value=min_date,
+            max_value=max_date
+        )
 
+    # --- Apply filters ---
     filtered_df = filter_data(df, rest_filter, meal_filter, search)
-    st.dataframe(filtered_df)
 
+    # Date range filter
+    if isinstance(date_range, tuple) and len(date_range) == 2:
+        start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
+        filtered_df = filtered_df[
+            (filtered_df['date'] >= start_date) & (filtered_df['date'] <= end_date)
+        ]
+
+    st.dataframe(filtered_df)
+    
     # --- Quantitative Summary ---
     st.subheader("📊 Quantitative Summary")
     df_stats = filtered_df.dropna(subset=['numeric_price']).copy()
