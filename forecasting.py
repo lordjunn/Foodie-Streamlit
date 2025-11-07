@@ -23,7 +23,7 @@ def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, f
     )
 
     # --- Drop very sparse months (too few data points) ---
-    ##monthly_df = monthly_df[monthly_df['n'] >= 3]  # you can adjust this threshold; likely not needed
+    monthly_df = monthly_df[monthly_df['n'] >= 3]  # you can adjust this threshold
     monthly_df = monthly_df[['date', 'y']].rename(columns={'date': 'ds'})
 
     if monthly_df.empty or len(monthly_df) < 3:
@@ -34,14 +34,14 @@ def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, f
     monthly_df['y'] = monthly_df['y'].interpolate(method='linear', limit_direction='both')
 
     # --- Optional: Light smoothing (3-month rolling mean) ---
-    monthly_df['y'] = monthly_df['y'].rolling(window=3, min_periods=1).mean()
+    ##monthly_df['y'] = monthly_df['y'].rolling(window=3, min_periods=1).mean()
 
     # --- Fit Prophet (trend-only, mild changepoint flexibility) ---
     model = Prophet(
         yearly_seasonality=False,
         weekly_seasonality=False,
         daily_seasonality=False,
-        changepoint_prior_scale=0.02  # less wiggly trend
+        changepoint_prior_scale=0.05  # less wiggly trend
     )
     model.fit(monthly_df.reset_index())
 
