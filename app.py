@@ -12,123 +12,20 @@ from dateutil import parser
 import plotly.express as px
 import plotly.figure_factory as ff
 from scipy.stats import norm
+import plotly.graph_objects as go
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="🍜 Junn Food Log Scraper & Data Explorer", layout="wide")
 sns.set_theme(style="whitegrid")
 
 # ---------- UTILS ----------
-def split_dish_and_restaurant(menu_item_name):
-    match = re.match(r"([^\[]+)(?:\s*\[\s*([^\]]+)\s*\])?", menu_item_name.strip())
-    if match:
-        dish_name = match.group(1).strip()
-        restaurant_name = match.group(2).strip() if match.group(2) else 'No restaurant name'
-        return dish_name, restaurant_name
-    return menu_item_name, 'No restaurant name'
-
-def preserve_inline_html(element):
-    if not element:
-        return 'No description'
-    html = element.decode_contents()
-    html = re.sub(r'(?<!<br>)<br\s*/?>', '', html, flags=re.IGNORECASE)
-    html = re.sub(r'(<br\s*/?>\s*){2}(?!<br)', '<br>', html, flags=re.IGNORECASE)
-    soup_fragment = BeautifulSoup(html, 'html.parser')
-    for tag in soup_fragment.find_all(True):
-        if tag.name not in ['b', 'i', 'strong', 'em', 'u', 'br', 'small']:
-            tag.unwrap()
-    return str(soup_fragment).strip()
-
-def parse_price(text):
-    if not text or text == 'No price':
-        return np.nan
-    text = text.replace(',', '')  # Remove commas
-    match = re.search(r'(\d+(?:\.\d+)?)', text)
-    return float(match.group(1)) if match else np.nan
-
-def normalize_meal_type(x):
-    x_lower = x.lower()
-    if "breakfast" in x_lower:
-        return "Breakfast"
-    elif "lunch" in x_lower:
-        return "Lunch"
-    elif "dinner" in x_lower:
-        return "Dinner"
-    else:
-        return "Other"
+from helpers import (
+    normalize_meal_type
+)
 
 # ---------- SCRAPER ----------
-def scrape_data(years, months):
-    base_url = "https://lordjunn.github.io/Food-MMU/Logs/"
-    urls = [f"{base_url}{month} {year}.html" for year in years for month in months]
-    menu_items = []
-
-    progress = st.progress(0)
-    total = len(urls)
-    count = 0
-
-    for url in urls:
-        count += 1
-        progress.progress(count / total)
-        try:
-            response = requests.get(url)
-            if response.status_code != 200:
-                continue
-            soup = BeautifulSoup(response.text, 'html.parser')
-
-            for menu_div in soup.find_all('div', class_='menu'):
-                # Skip footer-only menu divs
-                if menu_div.find('div', id='footer-container'):
-                    continue
-
-                # --- Parse the date ---
-                date_heading = menu_div.find('h2', class_='menu-group-heading')
-                date_obj = None
-                if date_heading:
-                    date_str = date_heading.text.strip()
-                    
-                    # Only parse if it looks like a proper date
-                    if re.match(r'\d{1,2}\s+\w+\s+\d{4}', date_str):
-                        # remove extra text in parentheses, e.g., "03 Nov 2025 (Monday)"
-                        date_str = re.sub(r'\s*\(.*?\)', '', date_str)
-                        try:
-                            date_obj = parser.parse(date_str, dayfirst=True)
-                        except Exception as e:
-                            st.warning(f"Failed to parse date '{date_str}' in {url}: {e}")
-                    else:
-                        continue  # skip this menu_div entirely
-
-                # --- Parse menu items ---
-                menu_group = menu_div.find('div', class_='menu-group')
-                if not menu_group:
-                    continue
-
-                for item in menu_group.find_all('div', class_='menu-item'):
-                    name = item.find('span', class_='menu-item-name')
-                    if not name or not name.text.strip():
-                        continue
-                    dish_name, restaurant_name = split_dish_and_restaurant(name.text)
-
-                    price = item.find('span', class_='menu-item-price')
-                    meal_type = item.find('span', class_='meal-type')
-                    description = item.find('p', class_='menu-item-description')
-
-                    menu_items.append({
-                        'date': date_obj,
-                        'dish_name': dish_name,
-                        'restaurant_name': restaurant_name,
-                        'price': price.text.strip() if price else 'No price',
-                        'numeric_price': parse_price(price.text.strip() if price else None),
-                        'meal_type': normalize_meal_type(meal_type.text.strip()) if meal_type else 'No meal type',
-                        'description': preserve_inline_html(description),
-                    })
-
-        except Exception as e:
-            st.error(f"Error scraping {url}: {e}")
-
-    progress.empty()
-    st.success("Scraping completed!")
-    return pd.DataFrame(menu_items)
-
+from scraper import scrape_data
+from forecasting import forecast_prices
 
 # ---------- FILTER & EXPLORE ----------
 def filter_data(df, restaurants, meal_types, search):
@@ -146,13 +43,60 @@ st.title("🍜 Junn Food Log Scraper & Data Science Explorer")
 
 # --- Sidebar: Scraping Settings ---
 st.sidebar.header("Scrape Settings")
-years = st.sidebar.multiselect("Years", [22, 23, 24, 25], default=[25])
-months = st.sidebar.multiselect(
-    "Months",
-    ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'],
-    default=['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov']
-)
+
+# Define options
+year_options = [22, 23, 24, 25]
+month_options = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+
+# Initialize session state
+if "selected_years" not in st.session_state:
+    st.session_state.selected_years = year_options.copy()
+if "selected_months" not in st.session_state:
+    st.session_state.selected_months = month_options.copy()
+
+# --- YEARS ---
+st.sidebar.subheader("Years")
+
+col1, col2, col3 = st.sidebar.columns([3, 1, 1])
+with col1:
+    years = st.multiselect(
+        "Select Years",
+        options=year_options,
+        default=st.session_state.selected_years,
+        key="year_multiselect"
+    )
+with col2:
+    if st.button("All", key="select_all_years"):
+        st.session_state.selected_years = year_options.copy()
+        st.session_state.year_multiselect = year_options.copy()
+with col3:
+    if st.button("Clear", key="clear_years"):
+        st.session_state.selected_years = []
+        st.session_state.year_multiselect = []
+
+# --- MONTHS ---
+st.sidebar.subheader("Months")
+
+col4, col5, col6 = st.sidebar.columns([3, 1, 1])
+with col4:
+    months = st.multiselect(
+        "Select Months",
+        options=month_options,
+        default=st.session_state.selected_months,
+        key="month_multiselect"
+    )
+with col5:
+    if st.button("All", key="select_all_months"):
+        st.session_state.selected_months = month_options.copy()
+        st.session_state.month_multiselect = month_options.copy()
+with col6:
+    if st.button("Clear", key="clear_months"):
+        st.session_state.selected_months = []
+        st.session_state.month_multiselect = []
+
+# --- SCRAPE BUTTON ---
 scrape_button = st.sidebar.button("🔍 Start Scraping")
+
 
 if scrape_button:
     st.subheader("Scraping in Progress...")
@@ -395,6 +339,38 @@ if 'data' in st.session_state:
                     col_index = (col_index + 1) % 2
                     if col_index == 0:
                         cols = st.columns(2)  # Start a new row of 2 columns
+
+            st.subheader("🔮 Forecast Next Month Prices")
+
+            if not filtered_df.empty:
+                periods = st.slider("Months to Forecast", 1, 12, 3)
+                forecast_df, model = forecast_prices(filtered_df, periods=periods)
+
+                # Plot
+                fig = go.Figure()
+                fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['y'], mode='lines+markers', name='Actual'))
+                fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat'], mode='lines', name='Forecast', line=dict(color='blue')))
+                fig.add_trace(go.Scatter(
+                    x=forecast_df['ds'],
+                    y=forecast_df['yhat_upper'],
+                    mode='lines',
+                    line=dict(width=0),
+                    showlegend=False
+                ))
+                fig.add_trace(go.Scatter(
+                    x=forecast_df['ds'],
+                    y=forecast_df['yhat_lower'],
+                    mode='lines',
+                    fill='tonexty',
+                    fillcolor='rgba(0, 0, 255, 0.1)',
+                    line=dict(width=0),
+                    name='Confidence Interval'
+                ))
+
+                fig.update_layout(title='Predicted Monthly Average Price', xaxis_title='Date', yaxis_title='Price (RM)')
+                st.plotly_chart(fig, use_container_width=True)
+            else:
+                st.info("Not enough data to forecast.")
 
 
 else:

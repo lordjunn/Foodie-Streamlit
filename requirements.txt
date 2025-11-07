@@ -8,6 +8,8 @@ scipy
 python-dateutil
 plotly
 statsmodels
+prophet
+
 rich==14.2.0
 markdown-it-py==4.0.0
 pygments==2.19.2
