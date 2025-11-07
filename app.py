@@ -18,6 +18,9 @@ import plotly.graph_objects as go
 st.set_page_config(page_title="🍜 Junn Food Log Scraper & Data Explorer", layout="wide")
 sns.set_theme(style="whitegrid")
 
+
+TAHUN = [22, 23, 24, 25]
+BULAN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 # ---------- UTILS ----------
 from helpers import (
     normalize_meal_type
@@ -38,69 +41,7 @@ def filter_data(df, restaurants, meal_types, search):
         filtered_df = filtered_df[filtered_df['dish_name'].str.contains(search, case=False, na=False)]
     return filtered_df
 
-# ---------- APP ----------
-st.title("🍜 Junn Food Log Scraper & Data Science Explorer")
-
-# --- Sidebar: Scraping Settings ---
-st.sidebar.header("Scrape Settings")
-
-# Define options
-year_options = [22, 23, 24, 25]
-month_options = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
-
-# Initialize session state
-if "selected_years" not in st.session_state:
-    st.session_state.selected_years = year_options.copy()
-if "selected_months" not in st.session_state:
-    st.session_state.selected_months = month_options.copy()
-
-# --- YEARS ---
-st.sidebar.subheader("Years")
-
-col1, col2, col3 = st.sidebar.columns([3, 1, 1])
-with col1:
-    years = st.multiselect(
-        "Select Years",
-        options=year_options,
-        default=st.session_state.selected_years,
-        key="year_multiselect"
-    )
-with col2:
-    if st.button("All", key="select_all_years"):
-        st.session_state.selected_years = year_options.copy()
-        st.session_state.year_multiselect = year_options.copy()
-with col3:
-    if st.button("Clear", key="clear_years"):
-        st.session_state.selected_years = []
-        st.session_state.year_multiselect = []
-
-# --- MONTHS ---
-st.sidebar.subheader("Months")
-
-col4, col5, col6 = st.sidebar.columns([3, 1, 1])
-with col4:
-    months = st.multiselect(
-        "Select Months",
-        options=month_options,
-        default=st.session_state.selected_months,
-        key="month_multiselect"
-    )
-with col5:
-    if st.button("All", key="select_all_months"):
-        st.session_state.selected_months = month_options.copy()
-        st.session_state.month_multiselect = month_options.copy()
-with col6:
-    if st.button("Clear", key="clear_months"):
-        st.session_state.selected_months = []
-        st.session_state.month_multiselect = []
-
-# --- SCRAPE BUTTON ---
-scrape_button = st.sidebar.button("🔍 Start Scraping")
-
-
-if scrape_button:
-    st.subheader("Scraping in Progress...")
-    df = scrape_data(years, months)
+def handle_scrape(df):
     if not df.empty:
         st.success(f"✅ Scraped {len(df)} items!")
         st.dataframe(df.head(20))
@@ -109,6 +50,34 @@ if scrape_button:
         st.session_state['data'] = df
     else:
         st.warning("No data found.")
+
+# ---------- APP ----------
+st.title("🍜 Junn Food Log Scraper & Data Science Explorer")
+
+# --- Sidebar: Scraping Settings ---
+st.sidebar.header("Scrape Settings")
+years = st.sidebar.multiselect("Years", TAHUN, default=[25])
+months = st.sidebar.multiselect(
+    "Months",
+    BULAN,
+    default=['Jul','Aug','Sep','Oct','Nov','Dec']
+    #['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+    #['Jan','Feb','Mar','Apr','May','Jun']
+    #['Jul','Aug','Sep','Oct','Nov','Dec']
+)
+scrape_button = st.sidebar.button("🔍 Start Scraping")
+st.sidebar.markdown("---")
+scrape_all_button = st.sidebar.button("🌎 Scrape All (Ignore Filters)")
+
+if scrape_button:
+    st.subheader("Selective scraping in Progress...")
+    handle_scrape(scrape_data(years, months)) 
+
+if scrape_all_button:
+    st.subheader("Super scraping in Progress...")
+    handle_scrape(scrape_data(TAHUN, BULAN))  
+
+
 
 # --- Data Explorer ---
 st.header("📋 Data Explorer")
