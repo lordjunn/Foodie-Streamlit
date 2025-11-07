@@ -16,8 +16,9 @@ def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, f
     all_months = pd.date_range(start=monthly_df['ds'].min(),
                                end=monthly_df['ds'].max(), freq=freq)
     monthly_df = monthly_df.set_index('ds').reindex(all_months).rename_axis('ds').reset_index()
-    monthly_df['y'] = monthly_df['y'].fillna(0)  # or use .interpolate() for smooth trend
-
+    monthly_df['y'] = monthly_df['y'].interpolate()
+    monthly_df['y'] = monthly_df['y'].fillna(0)  # fill start/end if needed
+    
     # Fit Prophet
     model = Prophet(yearly_seasonality=False, daily_seasonality=False, weekly_seasonality=False,
                     changepoint_prior_scale=0.05)  # less sensitive
