@@ -309,11 +309,13 @@ if 'data' in st.session_state:
                     if col_index == 0:
                         cols = st.columns(2)  # Start a new row of 2 columns
 
+            # ----------------- Streamlit app snippet -----------------
             st.subheader("🔮 Forecast Next Month Prices")
 
+            # Assume 'filtered_df' exists from your previous filtering
             if not filtered_df.empty:
                 periods = st.slider("Months to Forecast", 1, 12, 3)
-                forecast_df, model = forecast_prices(filtered_df, periods=periods)
+                forecast_df, model = forecast_prices(filtered_df, periods=periods, smooth=True)
 
                 # Plot
                 fig = go.Figure()

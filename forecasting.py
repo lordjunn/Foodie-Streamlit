@@ -1,12 +1,12 @@
 from prophet import Prophet
 import pandas as pd
 
-def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, freq='M'):
+def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, freq='M', smooth=False):
     """
     Forecast next few months of average prices using Prophet.
     - Aggregates by month only (not by restaurant)
-    - Handles missing months safely (no zero filling)
-    - Smooths slightly to reduce random spikes
+    - Handles missing months safely (does not require zero filling)
+    - Optional smoothing to reduce random spikes
     """
 
     # --- Clean and prep data ---
@@ -23,36 +23,33 @@ def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, f
     )
 
     # --- Drop very sparse months (too few data points) ---
-    monthly_df = monthly_df[monthly_df['n'] >= 3]  # you can adjust this threshold
+    monthly_df = monthly_df[monthly_df['n'] >= 3]  # adjust threshold if needed
     monthly_df = monthly_df[['date', 'y']].rename(columns={'date': 'ds'})
 
     if monthly_df.empty or len(monthly_df) < 3:
         raise ValueError("Not enough valid monthly data to forecast.")
 
-    # --- Fill missing months smoothly ---
-    monthly_df = monthly_df.set_index('ds').asfreq(freq)
-    monthly_df['y'] = monthly_df['y'].interpolate(method='linear', limit_direction='both')
+    # --- Optional: light smoothing ---
+    if smooth:
+        monthly_df['y'] = monthly_df['y'].rolling(window=3, min_periods=1).mean()
 
-    # --- Optional: Light smoothing (3-month rolling mean) ---
-    ##monthly_df['y'] = monthly_df['y'].rolling(window=3, min_periods=1).mean()
-
-    # --- Fit Prophet (trend-only, mild changepoint flexibility) ---
+    # --- Fit Prophet (trend-only) ---
     model = Prophet(
         yearly_seasonality=False,
         weekly_seasonality=False,
         daily_seasonality=False,
         changepoint_prior_scale=0.05  # less wiggly trend
     )
-    model.fit(monthly_df.reset_index())
+    model.fit(monthly_df)
 
     # --- Forecast future months ---
     future = model.make_future_dataframe(periods=periods, freq=freq)
     forecast = model.predict(future)
 
     # --- Merge actuals + predictions for plotting ---
-    merged = monthly_df.reset_index().merge(
+    merged = monthly_df.merge(
         forecast[['ds', 'yhat', 'yhat_lower', 'yhat_upper']],
         on='ds', how='outer'
-    )
+    ).sort_values('ds')
 
     return merged, model
