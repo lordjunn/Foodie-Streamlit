@@ -44,6 +44,7 @@ def filter_data(df, restaurants, meal_types, search):
 def handle_scrape(df):
     if not df.empty:
         st.success(f"✅ Scraped {len(df)} items!")
+        st.session_state['data'] = df
     else:
         st.warning("No data found.")
 
@@ -120,7 +121,6 @@ if 'data' in st.session_state:
     st.dataframe(filtered_df)
     csv = filtered_df.to_csv(index=False).encode('utf-8')
     st.download_button("💾 Download Filtered CSV", csv, "filtered_menu_items.csv", "text/csv")
-    st.session_state['data'] = filtered_df
     
     # --- Quantitative Summary ---
     st.subheader("📊 Quantitative Summary")
