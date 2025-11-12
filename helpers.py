@@ -34,10 +34,27 @@ def preserve_inline_html(element):
     return str(soup_fragment).strip()
 
 def parse_price(text):
+    """
+    Extract a numeric price from text. 
+    Handles cases like:
+        "<s>RM 8.50</s>Free??"  →  0.0
+        "Free" or "FREE!!"      →  0.0
+        "RM 12.00"              →  12.0
+    Returns NaN if no valid price info found.
+    """
     if not text or text == 'No price':
         return np.nan
-    text = text.replace(',', '')  # Remove commas
-    match = re.search(r'(\d+(?:\.\d+)?)', text)
+
+    text_clean = text.strip().lower()
+
+    # --- Handle "free" first ---
+    if re.search(r'\bfree\b', text_clean):
+        return 0.0
+
+    # --- Otherwise, look for a number (possibly with RM or $) ---
+    text_clean = text_clean.replace(',', '')
+    match = re.search(r'(\d+(?:\.\d+)?)', text_clean)
+
     return float(match.group(1)) if match else np.nan
 
 def normalize_meal_type(x):

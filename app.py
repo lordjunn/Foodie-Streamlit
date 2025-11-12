@@ -44,10 +44,6 @@ def filter_data(df, restaurants, meal_types, search):
 def handle_scrape(df):
     if not df.empty:
         st.success(f"✅ Scraped {len(df)} items!")
-        st.dataframe(df.head(20))
-        csv = df.to_csv(index=False).encode('utf-8')
-        st.download_button("💾 Download CSV", csv, "menu_items.csv", "text/csv")
-        st.session_state['data'] = df
     else:
         st.warning("No data found.")
 
@@ -122,6 +118,9 @@ if 'data' in st.session_state:
         ]
 
     st.dataframe(filtered_df)
+    csv = filtered_df.to_csv(index=False).encode('utf-8')
+    st.download_button("💾 Download Filtered CSV", csv, "filtered_menu_items.csv", "text/csv")
+    st.session_state['data'] = filtered_df
     
     # --- Quantitative Summary ---
     st.subheader("📊 Quantitative Summary")
@@ -314,7 +313,7 @@ if 'data' in st.session_state:
 
             # Assume 'filtered_df' exists from your previous filtering
             if not filtered_df.empty:
-                periods = st.slider("Months to Forecast", 1, 12, 3)
+                periods = st.slider("Months to Forecast", 1, 24, 3)
                 forecast_df, model = forecast_prices(filtered_df, periods=periods, smooth=True)
 
                 # Plot
