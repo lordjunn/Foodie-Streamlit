@@ -40,9 +40,6 @@ def parse_price(text):
     - If only 'Free' is mentioned, return 0.0.
     - If nothing valid, return NaN.
     """
-    import re
-    import numpy as np
-
     if not text or text == 'No price':
         return np.nan
 

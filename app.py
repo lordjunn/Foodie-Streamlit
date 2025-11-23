@@ -111,6 +111,11 @@ if 'data' in st.session_state:
     # --- Apply filters ---
     filtered_df = filter_data(df, rest_filter, meal_filter, search)
 
+    # NEW — Zero-value filter
+    ignore_zero = st.checkbox("Ignore zero or near-zero prices (numeric_price < 0.01)", value=False)
+    if ignore_zero:
+        filtered_df = filtered_df[filtered_df['numeric_price'] >= 0.01]
+
     # Date range filter
     if isinstance(date_range, tuple) and len(date_range) == 2:
         start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
