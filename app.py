@@ -4,15 +4,9 @@ from bs4 import BeautifulSoup
 import pandas as pd
 import re
 import numpy as np
-import matplotlib.pyplot as plt
 import seaborn as sns
-from scipy import stats
 from datetime import datetime
 from dateutil import parser
-import plotly.express as px
-import plotly.figure_factory as ff
-from scipy.stats import norm
-import plotly.graph_objects as go
 
 # ---------- CONFIG ----------
 st.set_page_config(page_title="🍜 Junn Food Log Scraper & Data Explorer", layout="wide")
@@ -29,6 +23,12 @@ from helpers import (
 # ---------- SCRAPER ----------
 from scraper import scrape_data
 from forecasting import forecast_prices
+import plots
+
+# [IMPROVEMENT] Caching
+@st.cache_data
+def convert_df(df):
+    return df.to_csv(index=False).encode('utf-8')
 
 # ---------- FILTER & EXPLORE ----------
 def filter_data(df, restaurants, meal_types, search):
@@ -123,229 +123,174 @@ if 'data' in st.session_state:
             (filtered_df['date'] >= start_date) & (filtered_df['date'] <= end_date)
         ]
 
-    st.dataframe(filtered_df)
-    csv = filtered_df.to_csv(index=False).encode('utf-8')
-    st.download_button("💾 Download Filtered CSV", csv, "filtered_menu_items.csv", "text/csv")
+    # [IMPROVEMENT] KPI Metrics
+    if not filtered_df.empty:
+        m1, m2, m3, m4 = st.columns(4)
+        m1.metric("Total Meals", f"{len(filtered_df)}")
+        if 'numeric_price' in filtered_df.columns and not filtered_df['numeric_price'].dropna().empty:
+             m2.metric("Avg Price", f"RM {filtered_df['numeric_price'].mean():.2f}")
+             m3.metric("Highest Price", f"RM {filtered_df['numeric_price'].max():.2f}")
+        else:
+             m2.metric("Avg Price", "-")
+             m3.metric("Highest Price", "-")
+        m4.metric("Most Visited", filtered_df['restaurant_name'].mode()[0] if not filtered_df.empty else "-")
+        st.markdown("---")
+
+    # [IMPROVEMENT] Create Tabs
+    tab1, tab2, tab3 = st.tabs(["📋 Data & Stats", "📈 Visualizations", "🔮 Forecasting"])
+
+    with tab1:
+        st.dataframe(filtered_df)
+        csv = convert_df(filtered_df)
+        st.download_button("💾 Download Filtered CSV", csv, "filtered_menu_items.csv", "text/csv")
     
     # --- Quantitative Summary ---
-    st.subheader("📊 Quantitative Summary")
-    df_stats = filtered_df.dropna(subset=['numeric_price']).copy()
-    if not df_stats.empty:
-        df_stats['meal_category'] = df_stats['meal_type'].apply(normalize_meal_type)
-        grouped_stats = df_stats.groupby('meal_category')['numeric_price'].agg(
-            ['mean', 'median', 'min', 'max', 'var', 'std', 'count']
-        ).rename(columns={
-            'mean':'Mean','median':'Median','min':'Min','max':'Max',
-            'var':'Variance','std':'Std Dev','count':'Count'
-        })
+        st.subheader("📊 Quantitative Summary")
+        df_stats = filtered_df.dropna(subset=['numeric_price']).copy()
+        if not df_stats.empty:
+            df_stats['meal_category'] = df_stats['meal_type'].apply(normalize_meal_type)
+            grouped_stats = df_stats.groupby('meal_category')['numeric_price'].agg(
+                ['mean', 'median', 'min', 'max', 'var', 'std', 'count']
+            ).rename(columns={
+                'mean':'Mean','median':'Median','min':'Min','max':'Max',
+                'var':'Variance','std':'Std Dev','count':'Count'
+            })
 
-        total_stats = pd.DataFrame({
-            'Mean':[df_stats['numeric_price'].mean()],
-            'Median':[df_stats['numeric_price'].median()],
-            'Min':[df_stats['numeric_price'].min()],
-            'Max':[df_stats['numeric_price'].max()],
-            'Variance':[df_stats['numeric_price'].var()],
-            'Std Dev':[df_stats['numeric_price'].std()],
-            'Count':[df_stats['numeric_price'].count()]
-        }, index=['🍽️ Grand Total'])
+            total_stats = pd.DataFrame({
+                'Mean':[df_stats['numeric_price'].mean()],
+                'Median':[df_stats['numeric_price'].median()],
+                'Min':[df_stats['numeric_price'].min()],
+                'Max':[df_stats['numeric_price'].max()],
+                'Variance':[df_stats['numeric_price'].var()],
+                'Std Dev':[df_stats['numeric_price'].std()],
+                'Count':[df_stats['numeric_price'].count()]
+            }, index=['🍽️ Grand Total'])
 
-        full_stats = pd.concat([grouped_stats, total_stats])
-        st.dataframe(full_stats.style.format({
-            'Mean': '{:.2f}', 'Median': '{:.2f}', 'Min': '{:.2f}', 'Max': '{:.2f}',
-            'Variance': '{:.2f}', 'Std Dev': '{:.2f}', 'Count': '{:,.0f}'
-        }))
+            full_stats = pd.concat([grouped_stats, total_stats])
+            st.dataframe(full_stats.style.format({
+                'Mean': '{:.2f}', 'Median': '{:.2f}', 'Min': '{:.2f}', 'Max': '{:.2f}',
+                'Variance': '{:.2f}', 'Std Dev': '{:.2f}', 'Count': '{:,.0f}'
+            }))
 
     # --- Visualizations ---
-    st.header("📈 Interactive Visualizations")
+    with tab2:
+        st.header("📈 Interactive Visualizations")
 
-    if not filtered_df.empty and 'numeric_price' in filtered_df.columns:
-        filtered_df['meal_category'] = filtered_df['meal_type'].apply(normalize_meal_type)
-        numeric_prices = filtered_df['numeric_price'].dropna()
-
-        if not numeric_prices.empty:
-            # --- Box Plot & QQ Plot side by side ---
-            colA, colB = st.columns(2)
-
-            # --- Box Plot ---
-            with colA:
-                st.subheader("Box Plot: Price by Meal Category")
-                fig_box = px.box(
-                    filtered_df, 
-                    x='meal_category', 
-                    y='numeric_price',
-                    color='meal_category', 
-                    points="all",
-                    hover_data=['dish_name', 'restaurant_name']
-                )
-                fig_box.update_layout(xaxis_title="Meal Category", yaxis_title="Price")
-                st.plotly_chart(fig_box, width='stretch')
-
-            # --- QQ Plot ---
-            with colB:
-                st.subheader("QQ Plot (Normality Check)")
-                sorted_prices = np.sort(numeric_prices)
-                theoretical_quantiles = np.sort(np.random.normal(numeric_prices.mean(), numeric_prices.std(), len(sorted_prices)))
-                qq_df = pd.DataFrame({
-                    "Theoretical Quantiles": theoretical_quantiles,
-                    "Sample Quantiles": sorted_prices
-                })
-                fig_qq = px.scatter(
-                    qq_df, 
-                    x="Theoretical Quantiles", 
-                    y="Sample Quantiles",
-                    hover_data=[qq_df.index]
-                )
-                fig_qq.add_shape(
-                    type="line",
-                    x0=qq_df["Theoretical Quantiles"].min(),
-                    y0=qq_df["Theoretical Quantiles"].min(),
-                    x1=qq_df["Theoretical Quantiles"].max(),
-                    y1=qq_df["Theoretical Quantiles"].max(),
-                    line=dict(color="red", dash="dash")
-                )
-                fig_qq.update_layout(xaxis_title="Theoretical Quantiles", yaxis_title="Sample Quantiles")
-                st.plotly_chart(fig_qq, width='stretch')
-
-            # --- Histogram with Normal Overlay ---
-            st.subheader("Price Distribution Histogram")
+        if not filtered_df.empty and 'numeric_price' in filtered_df.columns:
+            filtered_df['meal_category'] = filtered_df['meal_type'].apply(normalize_meal_type)
             numeric_prices = filtered_df['numeric_price'].dropna()
-            fig_hist = px.histogram(numeric_prices, nbins=20, opacity=0.7, marginal=None)
-            fig_hist.update_traces(name='Prices', marker_color='blue')
 
-            # Normal curve overlay
-            mean, std = numeric_prices.mean(), numeric_prices.std()
-            x_vals = np.linspace(numeric_prices.min(), numeric_prices.max(), 200)
-            bin_width = (numeric_prices.max() - numeric_prices.min()) / 20
-            y_vals = norm.pdf(x_vals, mean, std) * len(numeric_prices) * bin_width
+            if not numeric_prices.empty:
+                # --- Box Plot & QQ Plot side by side ---
+                colA, colB = st.columns(2)
 
-            fig_hist.add_scatter(x=x_vals, y=y_vals, mode='lines', line=dict(color='red'), name='Normal Curve')
-            st.plotly_chart(fig_hist, width='stretch')
+                # --- Box Plot ---
+                with colA:
+                    st.subheader("Box Plot: Price by Meal Category")
+                    fig_box = plots.plot_box_price_by_category(filtered_df)
+                    st.plotly_chart(fig_box, width='stretch')
 
-            # --- Prices Over Time ---
-            st.subheader("📅 Prices Over Time")
-            filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
-            time_df = filtered_df.dropna(subset=['numeric_price', 'date']).copy()
+                # --- QQ Plot ---
+                with colB:
+                    st.subheader("QQ Plot (Normality Check)")
+                    fig_qq = plots.plot_qq_normality_check(numeric_prices)
+                    st.plotly_chart(fig_qq, width='stretch')
 
-            if time_df.empty:
-                st.warning("No valid data for 'Prices Over Time' plot.")
-            else:
-                # Ensure numeric_price is float
-                time_df['numeric_price'] = pd.to_numeric(time_df['numeric_price'], errors='coerce')
-                time_df = time_df.dropna(subset=['numeric_price'])
+                # --- Histogram with Normal Overlay ---
+                st.subheader("Price Distribution Histogram")
+                fig_hist = plots.plot_price_distribution(numeric_prices)
+                st.plotly_chart(fig_hist, width='stretch')
+
+                # --- Prices Over Time ---
+                st.subheader("📅 Prices Over Time")
+                # Ensure date is datetime for plotting
+                filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
+                fig_time = plots.plot_prices_over_time(filtered_df)
                 
-                if len(time_df) < 2:
-                    st.warning("Not enough data points to plot 'Prices Over Time'.")
-                else:
-                    fig_time = px.scatter(
-                        time_df,
-                        x='date',
-                        y='numeric_price',
-                        color='meal_category',
-                        hover_data=['dish_name', 'restaurant_name'],
-                        trendline='lowess',
-                        title="Food Prices Over Time"
-                    )
-                    fig_time.update_layout(
-                        xaxis_title="Date",
-                        yaxis_title="Price",
-                        legend_title="Meal Type"
-                    )
+                if fig_time:
                     st.plotly_chart(fig_time, width='stretch')
+                    
+                    # --- LOWESS Monthly Summary per Meal Type (clean layout) ---
+                    st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
 
-            # --- LOWESS Monthly Summary per Meal Type (clean layout) ---
-            st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
+                    lowess_traces = [t for t in fig_time.data if getattr(t, "mode", None) == "lines"]
 
-            lowess_traces = [t for t in fig_time.data if getattr(t, "mode", None) == "lines"]
+                    if len(lowess_traces) == 0:
+                        st.info("No LOWESS trendlines found — try enabling trendline='lowess' in the plot.")
+                    else:
+                        # Make pairs of columns (2x2 layout)
+                        cols = st.columns(2)
+                        col_index = 0
 
-            if len(lowess_traces) == 0:
-                st.info("No LOWESS trendlines found — try enabling trendline='lowess' in the plot.")
-            else:
-                # Make pairs of columns (2x2 layout)
-                cols = st.columns(2)
-                col_index = 0
+                        for trace in lowess_traces:
+                            # Extract meal type
+                            meal_type = trace.name.replace("(lowess)", "").strip()
+                            lowess_x = pd.to_datetime(trace.x)
+                            lowess_y = trace.y
 
-                for trace in lowess_traces:
-                    # Extract meal type
-                    meal_type = trace.name.replace("(lowess)", "").strip()
-                    lowess_x = pd.to_datetime(trace.x)
-                    lowess_y = trace.y
+                            lowess_df = pd.DataFrame({
+                                'date': lowess_x,
+                                'lowess_price': lowess_y
+                            })
+                            lowess_df['year_month'] = lowess_df['date'].dt.to_period('M').astype(str)
 
-                    lowess_df = pd.DataFrame({
-                        'date': lowess_x,
-                        'lowess_price': lowess_y
-                    })
-                    lowess_df['year_month'] = lowess_df['date'].dt.to_period('M').astype(str)
+                            monthly_summary = lowess_df.groupby('year_month')['lowess_price'].agg(
+                                ['min', 'max', 'mean']
+                            ).rename(columns={
+                                'min': 'LOWESS Min',
+                                'max': 'LOWESS Max',
+                                'mean': 'LOWESS Avg'
+                            }).round(2)
 
-                    monthly_summary = lowess_df.groupby('year_month')['lowess_price'].agg(
-                        ['min', 'max', 'mean']
-                    ).rename(columns={
-                        'min': 'LOWESS Min',
-                        'max': 'LOWESS Max',
-                        'mean': 'LOWESS Avg'
-                    }).round(2)
+                            monthly_summary['Δ Avg'] = monthly_summary['LOWESS Avg'].diff().round(2)
+                            monthly_summary['% Change Avg'] = (
+                                monthly_summary['LOWESS Avg'].pct_change() * 100
+                            ).round(2)
 
-                    monthly_summary['Δ Avg'] = monthly_summary['LOWESS Avg'].diff().round(2)
-                    monthly_summary['% Change Avg'] = (
-                        monthly_summary['LOWESS Avg'].pct_change() * 100
-                    ).round(2)
+                            def highlight_change(val):
+                                if pd.isna(val):
+                                    return ''
+                                color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+                                return f'color: {color}; font-weight: bold;'
 
-                    def highlight_change(val):
-                        if pd.isna(val):
-                            return ''
-                        color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
-                        return f'color: {color}; font-weight: bold;'
+                            # Use the current column
+                            with cols[col_index]:
+                                st.markdown(f"### 🍽️ {meal_type}")
+                                st.dataframe(
+                                    monthly_summary.style.format({
+                                        'LOWESS Min': '{:.2f}',
+                                        'LOWESS Max': '{:.2f}',
+                                        'LOWESS Avg': '{:.2f}',
+                                        'Δ Avg': '{:+.2f}',
+                                        '% Change Avg': '{:+.2f}%'
+                                    }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                                )
 
-                    # Use the current column
-                    with cols[col_index]:
-                        st.markdown(f"### 🍽️ {meal_type}")
-                        st.dataframe(
-                            monthly_summary.style.format({
-                                'LOWESS Min': '{:.2f}',
-                                'LOWESS Max': '{:.2f}',
-                                'LOWESS Avg': '{:.2f}',
-                                'Δ Avg': '{:+.2f}',
-                                '% Change Avg': '{:+.2f}%'
-                            }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
-                        )
+                            # Alternate between left (0) and right (1) column
+                            col_index = (col_index + 1) % 2
+                            if col_index == 0:
+                                cols = st.columns(2)  # Start a new row of 2 columns
+                else:
+                    st.warning("Not enough data points to plot 'Prices Over Time'.")
 
-                    # Alternate between left (0) and right (1) column
-                    col_index = (col_index + 1) % 2
-                    if col_index == 0:
-                        cols = st.columns(2)  # Start a new row of 2 columns
+                # [IMPROVEMENT] Activity Heatmap
+                st.subheader("📅 Eating Habits Heatmap")
+                fig_cal = plots.plot_calendar_heatmap(filtered_df)
+                st.plotly_chart(fig_cal, use_container_width=True)
 
-            # ----------------- Streamlit app snippet -----------------
-            st.subheader("🔮 Forecast Next Month Prices")
+    with tab3:
+        st.subheader("🔮 Forecast Next Month Prices")
 
-            # Assume 'filtered_df' exists from your previous filtering
-            if not filtered_df.empty:
-                periods = st.slider("Months to Forecast", 1, 24, 3)
-                forecast_df, model = forecast_prices(filtered_df, periods=periods, smooth=True)
+        # Assume 'filtered_df' exists from your previous filtering
+        if not filtered_df.empty:
+            periods = st.slider("Months to Forecast", 1, 24, 3)
+            forecast_df, model = forecast_prices(filtered_df, periods=periods, smooth=True)
 
-                # Plot
-                fig = go.Figure()
-                fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['y'], mode='lines+markers', name='Actual'))
-                fig.add_trace(go.Scatter(x=forecast_df['ds'], y=forecast_df['yhat'], mode='lines', name='Forecast', line=dict(color='blue')))
-                fig.add_trace(go.Scatter(
-                    x=forecast_df['ds'],
-                    y=forecast_df['yhat_upper'],
-                    mode='lines',
-                    line=dict(width=0),
-                    showlegend=False
-                ))
-                fig.add_trace(go.Scatter(
-                    x=forecast_df['ds'],
-                    y=forecast_df['yhat_lower'],
-                    mode='lines',
-                    fill='tonexty',
-                    fillcolor='rgba(0, 0, 255, 0.1)',
-                    line=dict(width=0),
-                    name='Confidence Interval'
-                ))
-
-                fig.update_layout(title='Predicted Monthly Average Price', xaxis_title='Date', yaxis_title='Price (RM)')
-                st.plotly_chart(fig, use_container_width=True)
-            else:
-                st.info("Not enough data to forecast.")
+            # Plot
+            fig = plots.plot_forecast(forecast_df)
+            st.plotly_chart(fig, use_container_width=True)
+        else:
+            st.info("Not enough data to forecast.")
 
 
 else:
