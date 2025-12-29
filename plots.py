@@ -119,3 +119,54 @@ def plot_forecast(forecast_df):
 
     fig.update_layout(title='Predicted Monthly Average Price', xaxis_title='Date', yaxis_title='Price (RM)')
     return fig
+
+def plot_forecast_comparison(forecasts):
+    """Plot comparison of multiple forecast DataFrames.
+
+    `forecasts` is a dict mapping model name -> forecast DataFrame
+    expected columns: 'ds', 'yhat', optionally 'y', 'yhat_lower', 'yhat_upper'
+    """
+    colors = px.colors.qualitative.Plotly
+    fig = go.Figure()
+
+    # Plot actuals if any forecast contains observed 'y'
+    actual_plotted = False
+    for model_name, df in forecasts.items():
+        if 'y' in df.columns and not df['y'].dropna().empty and not actual_plotted:
+            df_act = df.dropna(subset=['ds', 'y']).copy()
+            df_act['ds'] = pd.to_datetime(df_act['ds'])
+            fig.add_trace(go.Scatter(
+                x=df_act['ds'], y=df_act['y'], mode='markers+lines', name='Actual', marker=dict(color='black'), line=dict(dash='dot')
+            ))
+            actual_plotted = True
+            break
+
+    def hex_to_rgb(h):
+        h = h.lstrip('#')
+        return tuple(int(h[i:i+2], 16) for i in (0, 2, 4))
+
+    for i, (model_name, df) in enumerate(forecasts.items()):
+        df = df.copy()
+        df['ds'] = pd.to_datetime(df['ds'])
+        color = colors[i % len(colors)]
+        # Line for forecast
+        fig.add_trace(go.Scatter(x=df['ds'], y=df['yhat'], mode='lines', name=f"{model_name} Forecast", line=dict(color=color)))
+
+        # Confidence interval as filled polygon when available
+        if 'yhat_lower' in df.columns and 'yhat_upper' in df.columns:
+            x_ci = list(df['ds']) + list(df['ds'][::-1])
+            y_ci = list(df['yhat_upper']) + list(df['yhat_lower'][::-1])
+            r, g, b = hex_to_rgb(color)
+            fig.add_trace(go.Scatter(
+                x=x_ci,
+                y=y_ci,
+                fill='toself',
+                fillcolor=f'rgba({r},{g},{b},0.12)',
+                line=dict(width=0),
+                hoverinfo='skip',
+                showlegend=False,
+                name=f"{model_name} CI"
+            ))
+
+    fig.update_layout(title='Forecast Model Comparison', xaxis_title='Date', yaxis_title='Price (RM)', legend_title='Model')
+    return fig
