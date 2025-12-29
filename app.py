@@ -13,7 +13,7 @@ st.set_page_config(page_title="🍜 Junn Food Log Scraper & Data Explorer", layo
 sns.set_theme(style="whitegrid")
 
 
-TAHUN = [22, 23, 24, 25]
+TAHUN = [22, 23, 24, 25, 26]
 BULAN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
 # ---------- UTILS ----------
 from helpers import (
@@ -22,7 +22,12 @@ from helpers import (
 
 # ---------- SCRAPER ----------
 from scraper import scrape_data
-from forecasting import forecast_prices
+from forecasting import (
+    forecast_prices,
+    forecast_linear_regression,
+    forecast_exponential_smoothing,
+    forecast_arima
+)
 import plots
 
 # [IMPROVEMENT] Caching
@@ -172,6 +177,110 @@ if 'data' in st.session_state:
                 'Variance': '{:.2f}', 'Std Dev': '{:.2f}', 'Count': '{:,.0f}'
             }))
 
+        # --- Monthly KPI Breakdown Table ---
+        st.subheader("📅 Monthly KPI Breakdown")
+        if not filtered_df.empty and 'numeric_price' in filtered_df.columns:
+            monthly_df = filtered_df.dropna(subset=['numeric_price', 'date']).copy()
+            monthly_df['year_month'] = monthly_df['date'].dt.to_period('M').astype(str)
+            
+            # Aggregate per month
+            monthly_kpi = monthly_df.groupby('year_month').agg(
+                Total_Meals=('numeric_price', 'count'),
+                Avg_Price=('numeric_price', 'mean'),
+                Min_Price=('numeric_price', 'min'),
+                Max_Price=('numeric_price', 'max'),
+                Most_Visited=('restaurant_name', lambda x: x.mode().iloc[0] if not x.mode().empty else '-')
+            ).reset_index()
+            
+            monthly_kpi['Δ Avg'] = monthly_kpi['Avg_Price'].diff().round(2)
+            monthly_kpi['% Change Avg'] = (monthly_kpi['Avg_Price'].pct_change() * 100).round(2)
+            monthly_kpi = monthly_kpi.set_index('year_month')
+            
+            def highlight_change(val):
+                if pd.isna(val):
+                    return ''
+                color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+                return f'color: {color}; font-weight: bold;'
+            
+            st.dataframe(
+                monthly_kpi.style.format({
+                    'Total_Meals': '{:,.0f}',
+                    'Avg_Price': 'RM {:.2f}',
+                    'Min_Price': 'RM {:.2f}',
+                    'Max_Price': 'RM {:.2f}',
+                    'Δ Avg': '{:+.2f}',
+                    '% Change Avg': '{:+.2f}%'
+                }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+            )
+
+        # --- LOWESS Monthly Summary per Meal Type ---
+        st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
+        if not filtered_df.empty and 'numeric_price' in filtered_df.columns:
+            filtered_df['meal_category'] = filtered_df['meal_type'].apply(normalize_meal_type)
+            filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
+            fig_time = plots.plot_prices_over_time(filtered_df)
+            
+            if fig_time:
+                lowess_traces = [t for t in fig_time.data if getattr(t, "mode", None) == "lines"]
+
+                if len(lowess_traces) == 0:
+                    st.info("No LOWESS trendlines found — try enabling trendline='lowess' in the plot.")
+                else:
+                    # Make pairs of columns (2x2 layout)
+                    cols = st.columns(2)
+                    col_index = 0
+
+                    for trace in lowess_traces:
+                        # Extract meal type
+                        meal_type = trace.name.replace("(lowess)", "").strip()
+                        lowess_x = pd.to_datetime(trace.x)
+                        lowess_y = trace.y
+
+                        lowess_df = pd.DataFrame({
+                            'date': lowess_x,
+                            'lowess_price': lowess_y
+                        })
+                        lowess_df['year_month'] = lowess_df['date'].dt.to_period('M').astype(str)
+
+                        monthly_summary = lowess_df.groupby('year_month')['lowess_price'].agg(
+                            ['min', 'max', 'mean']
+                        ).rename(columns={
+                            'min': 'LOWESS Min',
+                            'max': 'LOWESS Max',
+                            'mean': 'LOWESS Avg'
+                        }).round(2)
+
+                        monthly_summary['Δ Avg'] = monthly_summary['LOWESS Avg'].diff().round(2)
+                        monthly_summary['% Change Avg'] = (
+                            monthly_summary['LOWESS Avg'].pct_change() * 100
+                        ).round(2)
+
+                        def highlight_change(val):
+                            if pd.isna(val):
+                                return ''
+                            color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+                            return f'color: {color}; font-weight: bold;'
+
+                        # Use the current column
+                        with cols[col_index]:
+                            st.markdown(f"### 🍽️ {meal_type}")
+                            st.dataframe(
+                                monthly_summary.style.format({
+                                    'LOWESS Min': '{:.2f}',
+                                    'LOWESS Max': '{:.2f}',
+                                    'LOWESS Avg': '{:.2f}',
+                                    'Δ Avg': '{:+.2f}',
+                                    '% Change Avg': '{:+.2f}%'
+                                }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                            )
+
+                        # Alternate between left (0) and right (1) column
+                        col_index = (col_index + 1) % 2
+                        if col_index == 0:
+                            cols = st.columns(2)  # Start a new row of 2 columns
+            else:
+                st.info("Not enough data points to generate LOWESS summary.")
+
     # --- Visualizations ---
     with tab2:
         st.header("📈 Interactive Visualizations")
@@ -209,67 +318,6 @@ if 'data' in st.session_state:
                 
                 if fig_time:
                     st.plotly_chart(fig_time, width='stretch')
-                    
-                    # --- LOWESS Monthly Summary per Meal Type (clean layout) ---
-                    st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
-
-                    lowess_traces = [t for t in fig_time.data if getattr(t, "mode", None) == "lines"]
-
-                    if len(lowess_traces) == 0:
-                        st.info("No LOWESS trendlines found — try enabling trendline='lowess' in the plot.")
-                    else:
-                        # Make pairs of columns (2x2 layout)
-                        cols = st.columns(2)
-                        col_index = 0
-
-                        for trace in lowess_traces:
-                            # Extract meal type
-                            meal_type = trace.name.replace("(lowess)", "").strip()
-                            lowess_x = pd.to_datetime(trace.x)
-                            lowess_y = trace.y
-
-                            lowess_df = pd.DataFrame({
-                                'date': lowess_x,
-                                'lowess_price': lowess_y
-                            })
-                            lowess_df['year_month'] = lowess_df['date'].dt.to_period('M').astype(str)
-
-                            monthly_summary = lowess_df.groupby('year_month')['lowess_price'].agg(
-                                ['min', 'max', 'mean']
-                            ).rename(columns={
-                                'min': 'LOWESS Min',
-                                'max': 'LOWESS Max',
-                                'mean': 'LOWESS Avg'
-                            }).round(2)
-
-                            monthly_summary['Δ Avg'] = monthly_summary['LOWESS Avg'].diff().round(2)
-                            monthly_summary['% Change Avg'] = (
-                                monthly_summary['LOWESS Avg'].pct_change() * 100
-                            ).round(2)
-
-                            def highlight_change(val):
-                                if pd.isna(val):
-                                    return ''
-                                color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
-                                return f'color: {color}; font-weight: bold;'
-
-                            # Use the current column
-                            with cols[col_index]:
-                                st.markdown(f"### 🍽️ {meal_type}")
-                                st.dataframe(
-                                    monthly_summary.style.format({
-                                        'LOWESS Min': '{:.2f}',
-                                        'LOWESS Max': '{:.2f}',
-                                        'LOWESS Avg': '{:.2f}',
-                                        'Δ Avg': '{:+.2f}',
-                                        '% Change Avg': '{:+.2f}%'
-                                    }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
-                                )
-
-                            # Alternate between left (0) and right (1) column
-                            col_index = (col_index + 1) % 2
-                            if col_index == 0:
-                                cols = st.columns(2)  # Start a new row of 2 columns
                 else:
                     st.warning("Not enough data points to plot 'Prices Over Time'.")
 
@@ -281,16 +329,87 @@ if 'data' in st.session_state:
     with tab3:
         st.subheader("🔮 Forecast Next Month Prices")
 
-        # Assume 'filtered_df' exists from your previous filtering
         if not filtered_df.empty:
             periods = st.slider("Months to Forecast", 1, 24, 3)
-            forecast_df, model = forecast_prices(filtered_df, periods=periods, smooth=True)
-
-            # Plot
-            fig = plots.plot_forecast(forecast_df)
-            st.plotly_chart(fig, use_container_width=True)
+            
+            # Model selection
+            st.markdown("### Select Models to Compare")
+            col_m1, col_m2, col_m3, col_m4 = st.columns(4)
+            with col_m1:
+                use_prophet = st.checkbox("Prophet", value=True)
+            with col_m2:
+                use_linear = st.checkbox("Linear Regression", value=True)
+            with col_m3:
+                use_exp = st.checkbox("Exponential Smoothing", value=True)
+            with col_m4:
+                use_arima = st.checkbox("ARIMA", value=True)
+            
+            forecasts = {}
+            errors = []
+            
+            # Run selected models
+            if use_prophet:
+                try:
+                    forecast_df, _ = forecast_prices(filtered_df, periods=periods, smooth=True)
+                    forecasts['Prophet'] = forecast_df
+                except Exception as e:
+                    errors.append(f"Prophet: {e}")
+            
+            if use_linear:
+                try:
+                    forecast_df, _ = forecast_linear_regression(filtered_df, periods=periods)
+                    forecasts['Linear Regression'] = forecast_df
+                except Exception as e:
+                    errors.append(f"Linear Regression: {e}")
+            
+            if use_exp:
+                try:
+                    forecast_df, _ = forecast_exponential_smoothing(filtered_df, periods=periods)
+                    forecasts['Exponential Smoothing'] = forecast_df
+                except Exception as e:
+                    errors.append(f"Exponential Smoothing: {e}")
+            
+            if use_arima:
+                try:
+                    forecast_df, _ = forecast_arima(filtered_df, periods=periods)
+                    forecasts['ARIMA'] = forecast_df
+                except Exception as e:
+                    errors.append(f"ARIMA: {e}")
+            
+            # Show errors if any
+            if errors:
+                with st.expander("⚠️ Model Errors", expanded=False):
+                    for err in errors:
+                        st.warning(err)
+            
+            # Plot comparison if we have forecasts
+            if forecasts:
+                st.markdown("### 📊 Model Comparison")
+                fig_compare = plots.plot_forecast_comparison(forecasts)
+                st.plotly_chart(fig_compare, use_container_width=True)
+                
+                # Individual model plots
+                st.markdown("### 📈 Individual Model Forecasts")
+                for model_name, forecast_df in forecasts.items():
+                    with st.expander(f"{model_name} Details", expanded=False):
+                        fig = plots.plot_forecast(forecast_df)
+                        fig.update_layout(title=f"{model_name} Forecast")
+                        st.plotly_chart(fig, use_container_width=True)
+                        
+                        # Show forecast table
+                        st.dataframe(
+                            forecast_df.style.format({
+                                'y': '{:.2f}',
+                                'yhat': '{:.2f}',
+                                'yhat_lower': '{:.2f}',
+                                'yhat_upper': '{:.2f}'
+                            })
+                        )
+            else:
+                st.warning("No models could generate forecasts. Try adjusting your data filters.")
         else:
             st.info("Not enough data to forecast.")
+
 
 
 else:
