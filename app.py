@@ -281,6 +281,53 @@ if 'data' in st.session_state:
             else:
                 st.info("Not enough data points to generate LOWESS summary.")
 
+        # --- Monthly KPI Breakdown by Meal Type ---
+        st.subheader("📈 Monthly KPI by Meal Type")
+        if not filtered_df.empty and 'numeric_price' in filtered_df.columns:
+            mt_df = filtered_df.dropna(subset=['numeric_price', 'date']).copy()
+            mt_df['meal_category'] = mt_df['meal_type'].apply(normalize_meal_type)
+            mt_df['year_month'] = mt_df['date'].dt.to_period('M').astype(str)
+
+            grouped_mt = mt_df.groupby(['meal_category', 'year_month']).agg(
+                Total_Meals=('numeric_price', 'count'),
+                Avg_Price=('numeric_price', 'mean'),
+                Min_Price=('numeric_price', 'min'),
+                Max_Price=('numeric_price', 'max'),
+                Most_Visited=('restaurant_name', lambda x: x.mode().iloc[0] if not x.mode().empty else '-')
+            ).reset_index()
+
+            meal_types = grouped_mt['meal_category'].unique()
+            cols = st.columns(2)
+            col_index = 0
+
+            def highlight_change(val):
+                if pd.isna(val):
+                    return ''
+                color = 'green' if val > 0 else ('red' if val < 0 else 'gray')
+                return f'color: {color}; font-weight: bold;'
+
+            for meal in meal_types:
+                with cols[col_index]:
+                    st.markdown(f"### 🍽️ {meal}")
+                    mdf = grouped_mt[grouped_mt['meal_category'] == meal].set_index('year_month').drop(columns=['meal_category'])
+                    mdf['Δ Avg'] = mdf['Avg_Price'].diff().round(2)
+                    mdf['% Change Avg'] = (mdf['Avg_Price'].pct_change() * 100).round(2)
+
+                    st.dataframe(
+                        mdf.style.format({
+                            'Total_Meals': '{:,.0f}',
+                            'Avg_Price': 'RM {:.2f}',
+                            'Min_Price': 'RM {:.2f}',
+                            'Max_Price': 'RM {:.2f}',
+                            'Δ Avg': '{:+.2f}',
+                            '% Change Avg': '{:+.2f}%'
+                        }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                    )
+
+                col_index = (col_index + 1) % 2
+                if col_index == 0:
+                    cols = st.columns(2)
+
     # --- Visualizations ---
     with tab2:
         st.header("📈 Interactive Visualizations")
