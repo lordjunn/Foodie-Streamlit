@@ -1,11 +1,11 @@
-[theme]
-# Users can toggle between light and dark via Streamlit's built-in menu (⋮ → Settings → Theme).
-# These values define the custom "light" base; Streamlit auto-generates a complementary dark palette.
-base = "light"
-
-primaryColor = "#FF6B6B"          # coral accent — buttons, sliders, active widgets
-backgroundColor = "#FFFFFF"       # main background
-secondaryBackgroundColor = "#F5F5F5"  # sidebar / card background
-textColor = "#262730"             # primary text
-
-font = "sans serif"
+# Theme is left unset so users can toggle Light / Dark / System
+# via the built-in menu (☰ → Settings → Theme).
+#
+# To use a custom theme instead, uncomment below (replaces the toggle):
+# [theme]
+# base = "light"
+# primaryColor = "#FF6B6B"
+# backgroundColor = "#FFFFFF"
+# secondaryBackgroundColor = "#F5F5F5"
+# textColor = "#262730"
+# font = "sans serif"
