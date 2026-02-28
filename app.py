@@ -23,6 +23,7 @@ from helpers import (
 # ---------- SCRAPER ----------
 from scraper import scrape_data, scrape_data_raw
 import plotly.express as px
+import plotly.graph_objects as go
 from forecasting import (
     forecast_prices,
     forecast_linear_regression,
@@ -152,7 +153,134 @@ if 'data' in st.session_state:
         st.markdown("---")
 
     # [IMPROVEMENT] Create Tabs
-    tab1, tab2, tab3, tab4 = st.tabs(["📋 Data & Stats", "📈 Visualizations", "🔮 Forecasting", "🍽️ Food Images"])
+    tab_dash, tab1, tab2, tab3, tab4, tab_compare, tab_about = st.tabs([
+        "🏠 Dashboard", "📋 Data & Stats", "📈 Visualizations",
+        "🔮 Forecasting", "🍽️ Food Images", "🔄 Compare", "ℹ️ About"
+    ])
+
+    # ──────────────────────────────────────────────────────
+    # TAB — Dashboard Overview
+    # ──────────────────────────────────────────────────────
+    with tab_dash:
+        st.header("🏠 Dashboard Overview")
+
+        if filtered_df.empty:
+            st.info("No data to display. Adjust your filters or scrape more data.")
+        else:
+            # --- Hero Metrics ---
+            prices_valid = filtered_df['numeric_price'].dropna()
+            d1, d2, d3, d4, d5 = st.columns(5)
+            d1.metric("Total Meals", f"{len(filtered_df):,}")
+            d2.metric("Total Spend", f"RM {prices_valid.sum():,.2f}" if not prices_valid.empty else "—")
+            d3.metric("Avg per Meal", f"RM {prices_valid.mean():.2f}" if not prices_valid.empty else "—")
+            d4.metric("Unique Restaurants", filtered_df['restaurant_name'].nunique())
+            date_min = filtered_df['date'].min()
+            date_max = filtered_df['date'].max()
+            if pd.notna(date_min) and pd.notna(date_max):
+                d5.metric("Date Range", f"{date_min.strftime('%b %Y')} – {date_max.strftime('%b %Y')}")
+            else:
+                d5.metric("Date Range", "—")
+
+            st.markdown("---")
+
+            # --- Monthly Spending Trend (bar + line) ---
+            st.subheader("📈 Monthly Spending Trend")
+            trend_df = filtered_df.dropna(subset=['numeric_price', 'date']).copy()
+            if not trend_df.empty:
+                trend_df['year_month'] = trend_df['date'].dt.to_period('M').astype(str)
+                monthly_agg = trend_df.groupby('year_month').agg(
+                    total=('numeric_price', 'sum'),
+                    avg=('numeric_price', 'mean'),
+                    count=('numeric_price', 'count')
+                ).reset_index()
+
+                fig_trend = go.Figure()
+                fig_trend.add_trace(go.Bar(
+                    x=monthly_agg['year_month'], y=monthly_agg['total'],
+                    name='Total Spend (RM)', marker_color='#636EFA'
+                ))
+                fig_trend.add_trace(go.Scatter(
+                    x=monthly_agg['year_month'], y=monthly_agg['avg'],
+                    name='Avg Price (RM)', yaxis='y2',
+                    line=dict(color='#EF553B', width=3), mode='lines+markers'
+                ))
+                fig_trend.update_layout(
+                    yaxis=dict(title='Total Spend (RM)'),
+                    yaxis2=dict(title='Avg Price (RM)', overlaying='y', side='right'),
+                    legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
+                    height=400
+                )
+                st.plotly_chart(fig_trend, use_container_width=True)
+
+            # --- Top Restaurants + Top Dishes ---
+            col_l, col_r = st.columns(2)
+            with col_l:
+                st.subheader("🏆 Top 10 Restaurants")
+                top_rest = filtered_df['restaurant_name'].value_counts().head(10).reset_index()
+                top_rest.columns = ['Restaurant', 'Visits']
+                fig_rest = px.bar(top_rest, x='Visits', y='Restaurant', orientation='h',
+                                  color='Visits', color_continuous_scale='Blues')
+                fig_rest.update_layout(yaxis=dict(autorange='reversed'), height=400, showlegend=False)
+                st.plotly_chart(fig_rest, use_container_width=True)
+
+            with col_r:
+                st.subheader("🍜 Top 10 Most Ordered Dishes")
+                top_dish = filtered_df['dish_name'].value_counts().head(10).reset_index()
+                top_dish.columns = ['Dish', 'Orders']
+                fig_dish = px.bar(top_dish, x='Orders', y='Dish', orientation='h',
+                                  color='Orders', color_continuous_scale='Oranges')
+                fig_dish.update_layout(yaxis=dict(autorange='reversed'), height=400, showlegend=False)
+                st.plotly_chart(fig_dish, use_container_width=True)
+
+            # --- Day of Week + Meal Type ---
+            col_dow, col_mt = st.columns(2)
+            with col_dow:
+                st.subheader("📅 Meals by Day of Week")
+                dow_df = filtered_df.dropna(subset=['date']).copy()
+                if not dow_df.empty:
+                    dow_df['day_of_week'] = dow_df['date'].dt.day_name()
+                    dow_order = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday']
+                    dow_counts = dow_df['day_of_week'].value_counts().reindex(dow_order).fillna(0)
+                    fig_dow = px.bar(x=dow_counts.index, y=dow_counts.values,
+                                     labels={'x': 'Day', 'y': 'Meals'},
+                                     color=dow_counts.values, color_continuous_scale='Viridis')
+                    fig_dow.update_layout(height=350, showlegend=False)
+                    st.plotly_chart(fig_dow, use_container_width=True)
+
+            with col_mt:
+                st.subheader("🍽️ Meal Type Distribution")
+                mt_counts = filtered_df['meal_type'].value_counts()
+                if not mt_counts.empty:
+                    fig_mt = px.pie(values=mt_counts.values, names=mt_counts.index, hole=0.4)
+                    fig_mt.update_layout(height=350)
+                    st.plotly_chart(fig_mt, use_container_width=True)
+
+            # --- Personal Records ---
+            st.markdown("---")
+            st.subheader("🏅 Personal Records")
+            if not prices_valid.empty:
+                rec1, rec2, rec3, rec4 = st.columns(4)
+                most_exp = filtered_df.loc[filtered_df['numeric_price'].idxmax()]
+                cheapest_mask = filtered_df['numeric_price'] > 0
+                if cheapest_mask.any():
+                    cheapest = filtered_df.loc[filtered_df.loc[cheapest_mask, 'numeric_price'].idxmin()]
+                else:
+                    cheapest = filtered_df.loc[filtered_df['numeric_price'].idxmin()]
+
+                rec1.metric("💰 Most Expensive", f"RM {most_exp['numeric_price']:.2f}",
+                            most_exp['dish_name'][:30])
+                rec2.metric("🪙 Cheapest", f"RM {cheapest['numeric_price']:.2f}",
+                            cheapest['dish_name'][:30])
+
+                most_visited = filtered_df['restaurant_name'].value_counts()
+                if not most_visited.empty:
+                    rec3.metric("🏠 Most Visited", most_visited.index[0][:20],
+                                f"{most_visited.iloc[0]} visits")
+
+                most_ordered = filtered_df['dish_name'].value_counts()
+                if not most_ordered.empty:
+                    rec4.metric("🔁 Most Ordered", most_ordered.index[0][:20],
+                                f"{most_ordered.iloc[0]} times")
 
     with tab1:
         st.dataframe(filtered_df)
@@ -675,6 +803,193 @@ if 'data' in st.session_state:
                                     st.caption(
                                         f"📍 {row['restaurant_name']} · {p} · {d}"
                                     )
+
+    # ──────────────────────────────────────────────────────
+    # TAB — Month-to-Month Comparison
+    # ──────────────────────────────────────────────────────
+    with tab_compare:
+        st.header("🔄 Month-to-Month Comparison")
+
+        comp_df = filtered_df.dropna(subset=['numeric_price', 'date']).copy()
+        if not comp_df.empty:
+            comp_df['year_month'] = comp_df['date'].dt.to_period('M').astype(str)
+            available_months = sorted(comp_df['year_month'].unique())
+
+            if len(available_months) < 2:
+                st.warning("Need at least 2 months of data to compare.")
+            else:
+                c1, c2 = st.columns(2)
+                with c1:
+                    month_a = st.selectbox("Month A", available_months,
+                                           index=max(0, len(available_months) - 2), key="comp_a")
+                with c2:
+                    month_b = st.selectbox("Month B", available_months,
+                                           index=len(available_months) - 1, key="comp_b")
+
+                df_a = comp_df[comp_df['year_month'] == month_a]
+                df_b = comp_df[comp_df['year_month'] == month_b]
+
+                # --- Side-by-side KPIs ---
+                st.markdown("### 📊 Key Metrics")
+                k1, k2, k3, k4 = st.columns(4)
+
+                avg_a = df_a['numeric_price'].mean()
+                avg_b = df_b['numeric_price'].mean()
+                k1.metric(f"Avg Price ({month_a})", f"RM {avg_a:.2f}")
+                k1.metric(f"Avg Price ({month_b})", f"RM {avg_b:.2f}", f"{avg_b - avg_a:+.2f}")
+
+                count_a, count_b = len(df_a), len(df_b)
+                k2.metric(f"Total Meals ({month_a})", f"{count_a}")
+                k2.metric(f"Total Meals ({month_b})", f"{count_b}", f"{count_b - count_a:+d}")
+
+                spend_a = df_a['numeric_price'].sum()
+                spend_b = df_b['numeric_price'].sum()
+                k3.metric(f"Total Spend ({month_a})", f"RM {spend_a:.2f}")
+                k3.metric(f"Total Spend ({month_b})", f"RM {spend_b:.2f}", f"RM {spend_b - spend_a:+.2f}")
+
+                rest_a = df_a['restaurant_name'].nunique()
+                rest_b = df_b['restaurant_name'].nunique()
+                k4.metric(f"Restaurants ({month_a})", f"{rest_a}")
+                k4.metric(f"Restaurants ({month_b})", f"{rest_b}", f"{rest_b - rest_a:+d}")
+
+                st.markdown("---")
+
+                # --- Overlaid Histograms ---
+                st.subheader("📈 Price Distribution Comparison")
+                fig_comp = go.Figure()
+                fig_comp.add_trace(go.Histogram(
+                    x=df_a['numeric_price'], name=month_a, opacity=0.6, nbinsx=15
+                ))
+                fig_comp.add_trace(go.Histogram(
+                    x=df_b['numeric_price'], name=month_b, opacity=0.6, nbinsx=15
+                ))
+                fig_comp.update_layout(
+                    barmode='overlay', xaxis_title='Price (RM)',
+                    yaxis_title='Count', height=400
+                )
+                st.plotly_chart(fig_comp, use_container_width=True)
+
+                # --- Top Restaurants Comparison ---
+                st.subheader("🏆 Top Restaurants Comparison")
+                cr1, cr2 = st.columns(2)
+                with cr1:
+                    st.markdown(f"**{month_a}**")
+                    rest_a_counts = df_a['restaurant_name'].value_counts().head(5).reset_index()
+                    rest_a_counts.columns = ['Restaurant', 'Visits']
+                    st.dataframe(rest_a_counts, use_container_width=True, hide_index=True)
+                with cr2:
+                    st.markdown(f"**{month_b}**")
+                    rest_b_counts = df_b['restaurant_name'].value_counts().head(5).reset_index()
+                    rest_b_counts.columns = ['Restaurant', 'Visits']
+                    st.dataframe(rest_b_counts, use_container_width=True, hide_index=True)
+
+                # --- Meal Type Comparison ---
+                st.subheader("🍽️ Meal Type Comparison")
+                cm1, cm2 = st.columns(2)
+                with cm1:
+                    mt_a = df_a['meal_type'].value_counts()
+                    fig_ma = px.pie(values=mt_a.values, names=mt_a.index,
+                                    title=month_a, hole=0.4)
+                    st.plotly_chart(fig_ma, use_container_width=True)
+                with cm2:
+                    mt_b = df_b['meal_type'].value_counts()
+                    fig_mb = px.pie(values=mt_b.values, names=mt_b.index,
+                                    title=month_b, hole=0.4)
+                    st.plotly_chart(fig_mb, use_container_width=True)
+        else:
+            st.info("Not enough data for comparison. Adjust filters or scrape more data.")
+
+    # ──────────────────────────────────────────────────────
+    # TAB — About & Data Dictionary
+    # ──────────────────────────────────────────────────────
+    with tab_about:
+        st.header("ℹ️ About This Project")
+
+        st.markdown("""
+### 🍜 Junn Food Log Scraper & Data Science Explorer
+
+A **Streamlit-powered** web application that scrapes, cleans, analyzes, and forecasts
+personal food spending data from a custom food logging website.
+
+**Built by:** [lordjunn](https://github.com/lordjunn)
+
+---
+
+### 🛠️ Tech Stack
+
+| Component | Technology |
+|-----------|------------|
+| Frontend | Streamlit |
+| Data Scraping | BeautifulSoup, Requests |
+| Data Processing | Pandas, NumPy |
+| Visualization | Plotly, Seaborn |
+| Forecasting | Prophet, ARIMA, Exponential Smoothing, Linear Regression |
+| Statistics | SciPy, Statsmodels, Scikit-learn |
+
+---
+
+### 📐 Methodology
+
+1. **Data Collection** — Web scraping from custom HTML food logs hosted on GitHub Pages
+2. **Data Cleaning** — Price parsing, meal type normalization, date standardization
+3. **Exploratory Analysis** — Statistical summaries, LOWESS trendlines, distribution analysis (QQ plots, histograms)
+4. **Forecasting** — Multiple time-series models trained on monthly aggregated price data with confidence intervals
+5. **Visualization** — Interactive Plotly charts with filtering, sorting, and drill-down capabilities
+
+---
+
+### 🔮 Forecasting Models
+
+| Model | Description | Best For |
+|-------|-------------|----------|
+| **Prophet** | Facebook's time-series model with trend decomposition | Robust to missing data, handles holidays |
+| **Linear Regression** | Simple trend extrapolation on time index | Baseline comparison, linear trends |
+| **Exponential Smoothing** | Holt-Winters with additive trend | Short-term forecasts, smooth trends |
+| **ARIMA** | Autoregressive Integrated Moving Average | Stationary series with autocorrelation |
+
+---
+
+### 📊 Key Features
+
+- **Web Scraper** with progress UI and error handling for multi-month/year ingestion
+- **Interactive Data Explorer** with filters by restaurant, meal type, date range, and search
+- **Statistical Summaries** with per-category breakdowns and monthly KPIs with colour-coded deltas
+- **LOWESS Trendlines** for smoothed price analysis by meal type
+- **Multi-Model Forecasting** with comparison charts and confidence intervals
+- **Food Gallery** with card / list / dish evolution views, sorting and pagination
+- **Dashboard Overview** with hero metrics, top restaurants/dishes, and spending patterns
+- **Month-to-Month Comparison** for side-by-side analysis of spending periods
+        """)
+
+        st.markdown("---")
+
+        st.subheader("📖 Data Dictionary")
+        st.markdown("""
+| Column | Type | Description |
+|--------|------|-------------|
+| `date` | datetime | Date the meal was logged |
+| `dish_name` | string | Name of the dish ordered |
+| `restaurant_name` | string | Restaurant or food stall name (extracted from `[brackets]`) |
+| `price` | string | Raw price text as scraped (may include "Free", strikethrough, etc.) |
+| `numeric_price` | float | Parsed numeric price in RM; `NaN` if unparseable |
+| `meal_type` | string | Meal category: Breakfast, Lunch, Dinner, or Other |
+| `description` | string | Dish description with preserved inline HTML formatting |
+| `image_url` | string | URL to the food image (if available) |
+
+**Derived columns (computed in-app):**
+
+| Column | Type | Description |
+|--------|------|-------------|
+| `meal_category` | string | Normalized meal type (Breakfast / Lunch / Dinner / Other) |
+| `year_month` | string | Year-month period string (e.g., "2025-07") |
+        """)
+
+        st.markdown("---")
+        st.caption(
+            "Built with ❤️ using Streamlit · "
+            "[Source Code](https://github.com/lordjunn/Foodie-Streamlit) · "
+            "[Live Demo](https://junn-foodie-data-science.streamlit.app/)"
+        )
 
 
 else:
