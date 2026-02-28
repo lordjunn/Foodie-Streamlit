@@ -21,7 +21,8 @@ from helpers import (
 )
 
 # ---------- SCRAPER ----------
-from scraper import scrape_data
+from scraper import scrape_data, scrape_data_raw
+import plotly.express as px
 from forecasting import (
     forecast_prices,
     forecast_linear_regression,
@@ -34,6 +35,12 @@ import plots
 @st.cache_data
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
+
+# [IMPROVEMENT] 12-hour cache for scraped data
+@st.cache_data(ttl=43200, show_spinner="Loading data (first run may take a minute)…")
+def load_cached_data(years_tuple, months_tuple):
+    """Cache-safe scraping — no Streamlit UI widgets."""
+    return scrape_data_raw(list(years_tuple), list(months_tuple))
 
 # ---------- FILTER & EXPLORE ----------
 def filter_data(df, restaurants, meal_types, search):
@@ -48,7 +55,7 @@ def filter_data(df, restaurants, meal_types, search):
 
 def handle_scrape(df):
     if not df.empty:
-        st.success(f"✅ Scraped {len(df)} items!")
+        st.success(f"✅ Loaded {len(df)} items!")
         st.session_state['data'] = df
     else:
         st.warning("No data found.")
@@ -70,14 +77,17 @@ months = st.sidebar.multiselect(
 scrape_button = st.sidebar.button("🔍 Start Scraping")
 st.sidebar.markdown("---")
 scrape_all_button = st.sidebar.button("🌎 Scrape All (Ignore Filters)")
+clear_cache = st.sidebar.button("🗑️ Clear Cache")
+
+if clear_cache:
+    load_cached_data.clear()
+    st.toast("Cache cleared!")
 
 if scrape_button:
-    st.subheader("Selective scraping in Progress...")
-    handle_scrape(scrape_data(years, months)) 
+    handle_scrape(load_cached_data(tuple(years), tuple(months)))
 
 if scrape_all_button:
-    st.subheader("Super scraping in Progress...")
-    handle_scrape(scrape_data(TAHUN, BULAN))  
+    handle_scrape(load_cached_data(tuple(TAHUN), tuple(BULAN)))
 
 
 
@@ -142,7 +152,7 @@ if 'data' in st.session_state:
         st.markdown("---")
 
     # [IMPROVEMENT] Create Tabs
-    tab1, tab2, tab3 = st.tabs(["📋 Data & Stats", "📈 Visualizations", "🔮 Forecasting"])
+    tab1, tab2, tab3, tab4 = st.tabs(["📋 Data & Stats", "📈 Visualizations", "🔮 Forecasting", "🍽️ Food Images"])
 
     with tab1:
         st.dataframe(filtered_df)
@@ -457,6 +467,214 @@ if 'data' in st.session_state:
         else:
             st.info("Not enough data to forecast.")
 
+    # ──────────────────────────────────────────────────────
+    # TAB 4 — Food Gallery / Food Images
+    # ──────────────────────────────────────────────────────
+    with tab4:
+        st.header("🍽️ Food Gallery")
+
+        if filtered_df.empty:
+            st.info("No data to display. Adjust filters or scrape more data.")
+        else:
+            # Backward compat: ensure image_url column exists
+            if 'image_url' not in filtered_df.columns:
+                filtered_df['image_url'] = None
+
+            # --- Controls ---
+            gc1, gc2 = st.columns(2)
+            with gc1:
+                view_mode = st.radio(
+                    "View Mode",
+                    ["All Dishes", "By Dish", "By Restaurant"],
+                    horizontal=True,
+                    key="gallery_view",
+                )
+            with gc2:
+                sort_by = st.selectbox(
+                    "Sort by",
+                    ["Date (Newest)", "Date (Oldest)",
+                     "Price (High → Low)", "Price (Low → High)",
+                     "A → Z", "Z → A"],
+                    key="gallery_sort",
+                )
+
+            gallery_df = filtered_df.copy()
+
+            # --- View-specific filters ---
+            if view_mode == "By Dish":
+                dish_opts = sorted(gallery_df['dish_name'].dropna().unique())
+                if dish_opts:
+                    sel_dish = st.selectbox("Select Dish", dish_opts, key="gal_dish")
+                    gallery_df = gallery_df[gallery_df['dish_name'] == sel_dish]
+                else:
+                    st.warning("No dishes found.")
+            elif view_mode == "By Restaurant":
+                rest_opts = sorted(gallery_df['restaurant_name'].dropna().unique())
+                if rest_opts:
+                    sel_rest = st.selectbox("Select Restaurant", rest_opts, key="gal_rest")
+                    gallery_df = gallery_df[gallery_df['restaurant_name'] == sel_rest]
+                else:
+                    st.warning("No restaurants found.")
+
+            # --- Sorting ---
+            _sort_cfg = {
+                "Date (Newest)":      ("date", False),
+                "Date (Oldest)":      ("date", True),
+                "Price (High → Low)": ("numeric_price", False),
+                "Price (Low → High)": ("numeric_price", True),
+                "A → Z":              ("dish_name", True),
+                "Z → A":              ("dish_name", False),
+            }
+            _scol, _sasc = _sort_cfg[sort_by]
+            gallery_df = gallery_df.sort_values(
+                _scol, ascending=_sasc, na_position="last"
+            )
+
+            # --- Optional Price Trends (max 15 lines) ---
+            show_trend = st.checkbox("📈 Show Price Trends", key="gal_trend")
+            if show_trend and not gallery_df.empty:
+                _tdf = gallery_df.dropna(subset=["numeric_price", "date"]).copy()
+                _tdf["label"] = (
+                    _tdf["dish_name"] + " [" + _tdf["restaurant_name"] + "]"
+                )
+                _top = _tdf["label"].value_counts().head(15).index
+                _tdf = _tdf[_tdf["label"].isin(_top)]
+                if not _tdf.empty:
+                    _fig = px.line(
+                        _tdf.sort_values("date"),
+                        x="date",
+                        y="numeric_price",
+                        color="label",
+                        markers=True,
+                        title=f"Price Trends (Top {len(_top)} most ordered)",
+                    )
+                    _fig.update_layout(
+                        xaxis_title="Date",
+                        yaxis_title="Price (RM)",
+                        legend_title="Dish [Restaurant]",
+                        height=500,
+                    )
+                    st.plotly_chart(_fig, use_container_width=True)
+
+            # --- Gallery display ---
+            st.caption(f"Showing {len(gallery_df)} entries")
+
+            if gallery_df.empty:
+                st.info("No items match your current selection.")
+            else:
+                # Pagination
+                PER_PAGE = 24
+                total_pages = max(1, -(-len(gallery_df) // PER_PAGE))
+                page = st.number_input(
+                    "Page", 1, total_pages, 1, key="gal_page"
+                )
+                start = (page - 1) * PER_PAGE
+                page_df = gallery_df.iloc[start : start + PER_PAGE]
+
+                # ---------- By Dish: evolution view ----------
+                if view_mode == "By Dish":
+                    for rest_name, grp in page_df.groupby(
+                        "restaurant_name", sort=False
+                    ):
+                        st.subheader(f"📍 {rest_name}")
+                        grp = grp.sort_values("date")
+                        with st.container(height=420):
+                            for _, r in grp.iterrows():
+                                ci, ct = st.columns([1, 2])
+                                with ci:
+                                    img = r.get("image_url")
+                                    if pd.notna(img) and img:
+                                        st.image(img, use_container_width=True)
+                                    else:
+                                        st.markdown("🍽️ *No image*")
+                                with ct:
+                                    d = (
+                                        r["date"].strftime("%d %b %Y")
+                                        if pd.notna(r.get("date"))
+                                        else "—"
+                                    )
+                                    p = (
+                                        f"RM {r['numeric_price']:.2f}"
+                                        if pd.notna(r.get("numeric_price"))
+                                        else r.get("price", "—")
+                                    )
+                                    st.markdown(
+                                        f"**{d}** · {p} · _{r.get('meal_type', '')}_"
+                                    )
+                                    desc = r.get("description", "")
+                                    if pd.notna(desc) and desc not in (
+                                        "No description",
+                                        "",
+                                    ):
+                                        st.markdown(
+                                            desc, unsafe_allow_html=True
+                                        )
+                                st.divider()
+
+                # ---------- By Restaurant: list view ----------
+                elif view_mode == "By Restaurant":
+                    with st.container(height=600):
+                        for _, r in page_df.iterrows():
+                            ci, ct = st.columns([1, 2])
+                            with ci:
+                                img = r.get("image_url")
+                                if pd.notna(img) and img:
+                                    st.image(img, use_container_width=True)
+                                else:
+                                    st.markdown("🍽️ *No image*")
+                            with ct:
+                                d = (
+                                    r["date"].strftime("%d %b %Y")
+                                    if pd.notna(r.get("date"))
+                                    else "—"
+                                )
+                                p = (
+                                    f"RM {r['numeric_price']:.2f}"
+                                    if pd.notna(r.get("numeric_price"))
+                                    else r.get("price", "—")
+                                )
+                                st.markdown(f"**{r['dish_name']}** · {p}")
+                                st.caption(
+                                    f"📅 {d} · {r.get('meal_type', '')}"
+                                )
+                                desc = r.get("description", "")
+                                if pd.notna(desc) and desc not in (
+                                    "No description",
+                                    "",
+                                ):
+                                    st.markdown(desc, unsafe_allow_html=True)
+                            st.divider()
+
+                # ---------- All Dishes: card grid ----------
+                else:
+                    COLS = 3
+                    with st.container(height=600):
+                        for i in range(0, len(page_df), COLS):
+                            cols = st.columns(COLS)
+                            for j, col in enumerate(cols):
+                                if i + j >= len(page_df):
+                                    break
+                                row = page_df.iloc[i + j]
+                                with col:
+                                    img = row.get("image_url")
+                                    if pd.notna(img) and img:
+                                        st.image(
+                                            img, use_container_width=True
+                                        )
+                                    d = (
+                                        row["date"].strftime("%d %b %Y")
+                                        if pd.notna(row.get("date"))
+                                        else "—"
+                                    )
+                                    p = (
+                                        f"RM {row['numeric_price']:.2f}"
+                                        if pd.notna(row.get("numeric_price"))
+                                        else row.get("price", "—")
+                                    )
+                                    st.markdown(f"**{row['dish_name']}**")
+                                    st.caption(
+                                        f"📍 {row['restaurant_name']} · {p} · {d}"
+                                    )
 
 
 else:

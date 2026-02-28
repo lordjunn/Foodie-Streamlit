@@ -67,3 +67,4 @@ def normalize_meal_type(x):
         return "Dinner"
     else:
         return "Other"
+    
