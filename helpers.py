@@ -31,7 +31,11 @@ def preserve_inline_html(element):
     for tag in soup_fragment.find_all(True):
         if tag.name not in ['b', 'i', 'strong', 'em', 'u', 'br', 'small']:
             tag.unwrap()
-    return str(soup_fragment).strip()
+    result = str(soup_fragment).strip()
+    # Strip leading whitespace from each line so Markdown doesn't
+    # render indented text as code blocks (4+ spaces = <pre>)
+    result = '\n'.join(line.strip() for line in result.splitlines())
+    return result
 
 def parse_price(text):
     """
