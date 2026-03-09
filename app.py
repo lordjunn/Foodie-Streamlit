@@ -12,58 +12,6 @@ from dateutil import parser
 st.set_page_config(page_title="🍜 Junn Food Log Scraper & Data Explorer", layout="wide")
 sns.set_theme(style="whitegrid")
 
-# ---------- DARK / LIGHT MODE TOGGLE ----------
-if 'dark_mode' not in st.session_state:
-    st.session_state['dark_mode'] = False
-
-def _inject_theme_css():
-    if st.session_state['dark_mode']:
-        css = """
-        <style>
-            /* ---------- Dark mode overrides ---------- */
-            :root {
-                color-scheme: dark;
-            }
-            .stApp {
-                background-color: #0E1117;
-                color: #FAFAFA;
-            }
-            [data-testid="stSidebar"] {
-                background-color: #1A1C23;
-            }
-            [data-testid="stHeader"] {
-                background-color: #0E1117;
-            }
-            .stTabs [data-baseweb="tab-list"] {
-                background-color: #0E1117;
-            }
-            .stMarkdown, .stText, .stCaption, h1, h2, h3, h4, h5, h6,
-            [data-testid="stMetricValue"], [data-testid="stMetricLabel"],
-            [data-testid="stMetricDelta"] {
-                color: #FAFAFA !important;
-            }
-            [data-testid="stDataFrame"], [data-testid="stTable"] {
-                background-color: #1A1C23;
-            }
-        </style>
-        """
-    else:
-        css = """
-        <style>
-            /* ---------- Light mode (default) ---------- */
-            .stApp {
-                background-color: #FFFFFF;
-                color: #262730;
-            }
-            [data-testid="stSidebar"] {
-                background-color: #F5F5F5;
-            }
-        </style>
-        """
-    st.markdown(css, unsafe_allow_html=True)
-
-_inject_theme_css()
-
 
 TAHUN = [22, 23, 24, 25, 26]
 BULAN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
@@ -118,14 +66,6 @@ st.title("🍜 Junn Food Log Scraper & Data Science Explorer")
 
 # --- Sidebar: Scraping Settings ---
 st.sidebar.header("Scrape Settings")
-
-# Theme toggle
-theme_label = "🌙 Dark Mode" if not st.session_state['dark_mode'] else "☀️ Light Mode"
-if st.sidebar.button(theme_label, use_container_width=True):
-    st.session_state['dark_mode'] = not st.session_state['dark_mode']
-    st.rerun()
-
-st.sidebar.markdown("---")
 years = st.sidebar.multiselect("Years", TAHUN, default=[25])
 months = st.sidebar.multiselect(
     "Months",
