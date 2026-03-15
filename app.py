@@ -90,7 +90,11 @@ if scrape_button:
 if scrape_all_button:
     handle_scrape(load_cached_data(tuple(TAHUN), tuple(BULAN)))
 
-
+# Auto-load data on first visit so users don't need to click scrape
+if 'data' not in st.session_state:
+    _auto = load_cached_data(tuple(years), tuple(months))
+    if not _auto.empty:
+        st.session_state['data'] = _auto
 
 # --- Data Explorer ---
 st.header("📋 Data Explorer")
@@ -657,6 +661,12 @@ if 'data' in st.session_state:
             gallery_df = gallery_df.sort_values(
                 _scol, ascending=_sasc, na_position="last"
             )
+
+            # Cap gallery to avoid memory spikes from loading hundreds of images
+            MAX_GALLERY = 100
+            if len(gallery_df) > MAX_GALLERY:
+                st.info(f"Showing first {MAX_GALLERY} of {len(gallery_df)} items. Use filters to narrow down.")
+                gallery_df = gallery_df.head(MAX_GALLERY)
 
             # --- Optional Price Trends (max 15 lines) ---
             show_trend = st.checkbox("📈 Show Price Trends", key="gal_trend")

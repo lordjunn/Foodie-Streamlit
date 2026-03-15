@@ -1,9 +1,5 @@
-from prophet import Prophet
 import pandas as pd
 import numpy as np
-from sklearn.linear_model import LinearRegression
-from statsmodels.tsa.holtwinters import ExponentialSmoothing
-from statsmodels.tsa.arima.model import ARIMA
 
 def prepare_monthly_data(df, date_col='date', price_col='numeric_price', freq='M', min_points=3):
     """
@@ -38,6 +34,7 @@ def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, f
     if smooth:
         monthly_df['y'] = monthly_df['y'].rolling(window=3, min_periods=1).mean()
 
+    from prophet import Prophet
     model = Prophet(
         yearly_seasonality=False,
         weekly_seasonality=False,
@@ -72,6 +69,7 @@ def forecast_linear_regression(df, date_col='date', price_col='numeric_price', p
     X = monthly_df[['time_idx']].values
     y = monthly_df['y'].values
 
+    from sklearn.linear_model import LinearRegression
     model = LinearRegression()
     model.fit(X, y)
 
@@ -108,6 +106,7 @@ def forecast_exponential_smoothing(df, date_col='date', price_col='numeric_price
     monthly_df = monthly_df.sort_values('ds').reset_index(drop=True)
     y = monthly_df['y'].values
 
+    from statsmodels.tsa.holtwinters import ExponentialSmoothing
     # Use additive trend, no seasonality (too few data points typically)
     model = ExponentialSmoothing(
         y,
@@ -154,6 +153,7 @@ def forecast_arima(df, date_col='date', price_col='numeric_price', periods=3, fr
     monthly_df = monthly_df.sort_values('ds').reset_index(drop=True)
     y = monthly_df['y'].values
 
+    from statsmodels.tsa.arima.model import ARIMA
     model = ARIMA(y, order=order).fit()
 
     # Forecast
