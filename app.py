@@ -352,7 +352,7 @@ if 'data' in st.session_state:
                     'Max_Price': 'RM {:.2f}',
                     'Δ Avg': '{:+.2f}',
                     '% Change Avg': '{:+.2f}%'
-                }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                }).map(highlight_change, subset=['Δ Avg', '% Change Avg'])
             )
 
         # --- LOWESS Monthly Summary per Meal Type ---
@@ -413,7 +413,7 @@ if 'data' in st.session_state:
                                     'LOWESS Avg': '{:.2f}',
                                     'Δ Avg': '{:+.2f}',
                                     '% Change Avg': '{:+.2f}%'
-                                }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                                    }).map(highlight_change, subset=['Δ Avg', '% Change Avg'])
                             )
 
                         # Alternate between left (0) and right (1) column
@@ -463,7 +463,7 @@ if 'data' in st.session_state:
                             'Max_Price': 'RM {:.2f}',
                             'Δ Avg': '{:+.2f}',
                             '% Change Avg': '{:+.2f}%'
-                        }).applymap(highlight_change, subset=['Δ Avg', '% Change Avg'])
+                        }).map(highlight_change, subset=['Δ Avg', '% Change Avg'])
                     )
 
                 col_index = (col_index + 1) % 2
