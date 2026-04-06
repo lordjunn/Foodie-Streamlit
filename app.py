@@ -633,6 +633,10 @@ if 'data' in st.session_state:
 
             gallery_df = filtered_df.copy()
 
+            # ✅ Force default image for missing/empty values
+            gallery_df["image_url"] = gallery_df["image_url"].fillna("")
+            gallery_df.loc[gallery_df["image_url"].str.strip() == "", "image_url"] = DEFAULT_IMG
+
             # --- View-specific filters ---
             if view_mode == "By Dish":
                 dish_opts = sorted(gallery_df['dish_name'].dropna().unique())
@@ -725,7 +729,7 @@ if 'data' in st.session_state:
                                     if pd.notna(img) and img:
                                         st.image(img, use_container_width=True)
                                     else:
-                                        st.image(DEFAULT_IMG, use_container_width=True)
+                                        st.markdown("🍽️ *No image*")
                                 with ct:
                                     d = (
                                         r["date"].strftime("%d %b %Y")
