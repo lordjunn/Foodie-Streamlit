@@ -1,10 +1,17 @@
 import pandas as pd
 import numpy as np
 
-def prepare_monthly_data(df, date_col='date', price_col='numeric_price', freq='M', min_points=3):
+def _normalize_freq(freq):
+    # Pandas 2.2+ no longer supports 'M' alias; use month-end 'ME' instead.
+    return 'ME' if freq == 'M' else freq
+
+
+def prepare_monthly_data(df, date_col='date', price_col='numeric_price', freq='ME', min_points=3):
     """
     Prepare monthly aggregated data for forecasting.
     """
+    freq = _normalize_freq(freq)
+
     df = df.dropna(subset=[date_col, price_col]).copy()
     df[date_col] = pd.to_datetime(df[date_col], errors='coerce')
     df = df.dropna(subset=[date_col])
@@ -22,10 +29,11 @@ def prepare_monthly_data(df, date_col='date', price_col='numeric_price', freq='M
     return monthly_df
 
 
-def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, freq='M', smooth=False):
+def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, freq='ME', smooth=False):
     """
     Forecast using Prophet (trend-only).
     """
+    freq = _normalize_freq(freq)
     monthly_df = prepare_monthly_data(df, date_col, price_col, freq)
 
     if monthly_df.empty or len(monthly_df) < 3:
@@ -54,10 +62,11 @@ def forecast_prices(df, date_col='date', price_col='numeric_price', periods=3, f
     return merged, model
 
 
-def forecast_linear_regression(df, date_col='date', price_col='numeric_price', periods=3, freq='M'):
+def forecast_linear_regression(df, date_col='date', price_col='numeric_price', periods=3, freq='ME'):
     """
     Forecast using Linear Regression on time index.
     """
+    freq = _normalize_freq(freq)
     monthly_df = prepare_monthly_data(df, date_col, price_col, freq)
 
     if monthly_df.empty or len(monthly_df) < 3:
@@ -94,10 +103,11 @@ def forecast_linear_regression(df, date_col='date', price_col='numeric_price', p
     return all_df[['ds', 'y', 'yhat', 'yhat_lower', 'yhat_upper']], model
 
 
-def forecast_exponential_smoothing(df, date_col='date', price_col='numeric_price', periods=3, freq='M'):
+def forecast_exponential_smoothing(df, date_col='date', price_col='numeric_price', periods=3, freq='ME'):
     """
     Forecast using Holt-Winters Exponential Smoothing.
     """
+    freq = _normalize_freq(freq)
     monthly_df = prepare_monthly_data(df, date_col, price_col, freq)
 
     if monthly_df.empty or len(monthly_df) < 4:
@@ -141,10 +151,11 @@ def forecast_exponential_smoothing(df, date_col='date', price_col='numeric_price
     return all_df[['ds', 'y', 'yhat', 'yhat_lower', 'yhat_upper']], model
 
 
-def forecast_arima(df, date_col='date', price_col='numeric_price', periods=3, freq='M', order=(1, 1, 1)):
+def forecast_arima(df, date_col='date', price_col='numeric_price', periods=3, freq='ME', order=(1, 1, 1)):
     """
     Forecast using ARIMA model.
     """
+    freq = _normalize_freq(freq)
     monthly_df = prepare_monthly_data(df, date_col, price_col, freq)
 
     if monthly_df.empty or len(monthly_df) < 5:
