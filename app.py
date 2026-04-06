@@ -15,6 +15,7 @@ sns.set_theme(style="whitegrid")
 
 TAHUN = [22, 23, 24, 25, 26]
 BULAN = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
+DEFAULT_IMG = "https://i.ytimg.com/vi/geOCvzwdt-s/maxresdefault.jpg"
 # ---------- UTILS ----------
 from helpers import (
     normalize_meal_type
@@ -724,7 +725,7 @@ if 'data' in st.session_state:
                                     if pd.notna(img) and img:
                                         st.image(img, use_container_width=True)
                                     else:
-                                        st.markdown("🍽️ *No image*")
+                                        st.image(DEFAULT_IMG, use_container_width=True)
                                 with ct:
                                     d = (
                                         r["date"].strftime("%d %b %Y")
