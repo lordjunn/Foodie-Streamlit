@@ -51,6 +51,14 @@ A full-featured **Streamlit** web application that scrapes, cleans, explores, an
 - Sorting: date, price, alphabetical
 - Pagination (24 per page)
 - Optional price trend overlay (top 15 most ordered)
+- Default fallback image is shown whenever a dish has no image URL
+
+### 💾 Persistent Data Cache (SQLite)
+- App now loads from local SQLite DB first (`food_log_cache.db`)
+- If DB already has data, scraping runs incrementally from the latest month in DB onward
+- Example: if latest DB date is `2026-04-06`, scrape will only target `Apr 26` (and later requested months), not earlier months
+- If DB is empty, app auto-scrapes using default preloaded settings and then saves to DB
+- In-memory Streamlit cache clear does not delete the SQLite DB
 
 ### ℹ️ About & Data Dictionary
 - Project description, tech stack, and methodology
@@ -69,6 +77,7 @@ A full-featured **Streamlit** web application that scrapes, cleans, explores, an
 | Visualization | Plotly, Seaborn |
 | Forecasting | Prophet, ARIMA (statsmodels), Exponential Smoothing, Scikit-learn |
 | Statistics | SciPy |
+| Local Persistence | SQLite (Python stdlib `sqlite3`) |
 
 ---
 
@@ -105,9 +114,11 @@ Foodie-Streamlit/
 │   └── config.toml        # Theme configuration (dark/light mode)
 ├── app.py                  # Main Streamlit application
 ├── scraper.py              # Web scraper (with and without progress bar)
+├── db.py                   # SQLite read/write + incremental month logic
 ├── helpers.py              # Utility functions (parsing, normalization)
 ├── forecasting.py          # Forecasting models (Prophet, LR, ETS, ARIMA)
 ├── plots.py                # Plotly chart builders
+├── food_log_cache.db       # Local cache DB (created at runtime)
 ├── requirements.txt        # Python dependencies
 └── README.md
 ```

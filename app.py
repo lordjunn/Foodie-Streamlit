@@ -22,7 +22,16 @@ from helpers import (
 )
 
 # ---------- SCRAPER ----------
-from scraper import scrape_data, scrape_data_raw
+from scraper import scrape_data_raw, scrape_data_raw_pairs
+from db import (
+    init_db,
+    load_data_from_db,
+    save_data_to_db,
+    merge_with_existing_and_save,
+    get_latest_date_from_df,
+    build_year_month_pairs,
+    filter_incremental_pairs,
+)
 import plotly.express as px
 import plotly.graph_objects as go
 from forecasting import (
@@ -38,11 +47,53 @@ import plots
 def convert_df(df):
     return df.to_csv(index=False).encode('utf-8')
 
-# [IMPROVEMENT] 12-hour cache for scraped data
-@st.cache_data(ttl=43200, show_spinner="Loading data (first run may take a minute)…")
-def load_cached_data(years_tuple, months_tuple):
-    """Cache-safe scraping — no Streamlit UI widgets."""
-    return scrape_data_raw(list(years_tuple), list(months_tuple))
+
+def apply_default_image(df):
+    if df is None or df.empty:
+        return df
+    out = df.copy()
+    if 'image_url' not in out.columns:
+        out['image_url'] = DEFAULT_IMG
+    out['image_url'] = out['image_url'].fillna('')
+    out.loc[out['image_url'].astype(str).str.strip() == '', 'image_url'] = DEFAULT_IMG
+    return out
+
+
+def load_or_bootstrap_data(default_years, default_months):
+    db_df = apply_default_image(load_data_from_db())
+    if not db_df.empty:
+        return db_df
+
+    scraped = apply_default_image(scrape_data_raw(default_years, default_months))
+    if not scraped.empty:
+        save_data_to_db(scraped)
+    return scraped
+
+
+def run_incremental_scrape(requested_years, requested_months):
+    existing_df = apply_default_image(load_data_from_db())
+    latest_date = get_latest_date_from_df(existing_df)
+    all_pairs = build_year_month_pairs(requested_years, requested_months)
+
+    if latest_date is None:
+        scrape_pairs = all_pairs
+    else:
+        scrape_pairs = filter_incremental_pairs(all_pairs, latest_date)
+
+    if not scrape_pairs:
+        st.info("DB is already up to date for your selected months.")
+        return existing_df
+
+    with st.spinner(f"Scraping {len(scrape_pairs)} month(s) not fully cached in DB..."):
+        scraped_df = apply_default_image(scrape_data_raw_pairs(scrape_pairs))
+
+    if scraped_df.empty:
+        st.warning("Scraping finished, but no new rows were found.")
+        return existing_df
+
+    merged_df = apply_default_image(merge_with_existing_and_save(scraped_df))
+    st.success(f"✅ Added {len(scraped_df)} scraped rows. DB now has {len(merged_df)} rows.")
+    return merged_df
 
 # ---------- FILTER & EXPLORE ----------
 def filter_data(df, restaurants, meal_types, search):
@@ -67,11 +118,14 @@ st.title("🍜 Junn Food Log Scraper & Data Science Explorer")
 
 # --- Sidebar: Scraping Settings ---
 st.sidebar.header("Scrape Settings")
-years = st.sidebar.multiselect("Years", TAHUN, default=[25])
+DEFAULT_YEARS = [25]
+DEFAULT_MONTHS = ['Jul','Aug','Sep','Oct','Nov','Dec']
+
+years = st.sidebar.multiselect("Years", TAHUN, default=DEFAULT_YEARS)
 months = st.sidebar.multiselect(
     "Months",
     BULAN,
-    default=['Jul','Aug','Sep','Oct','Nov','Dec']
+    default=DEFAULT_MONTHS
     #['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec']
     #['Jan','Feb','Mar','Apr','May','Jun']
     #['Jul','Aug','Sep','Oct','Nov','Dec']
@@ -82,18 +136,20 @@ scrape_all_button = st.sidebar.button("🌎 Scrape All (Ignore Filters)")
 clear_cache = st.sidebar.button("🗑️ Clear Cache")
 
 if clear_cache:
-    load_cached_data.clear()
-    st.toast("Cache cleared!")
+    st.cache_data.clear()
+    st.toast("In-memory cache cleared (DB is kept).")
+
+init_db()
 
 if scrape_button:
-    handle_scrape(load_cached_data(tuple(years), tuple(months)))
+    handle_scrape(run_incremental_scrape(years, months))
 
 if scrape_all_button:
-    handle_scrape(load_cached_data(tuple(TAHUN), tuple(BULAN)))
+    handle_scrape(run_incremental_scrape(TAHUN, BULAN))
 
 # Auto-load data on first visit so users don't need to click scrape
 if 'data' not in st.session_state:
-    _auto = load_cached_data(tuple(years), tuple(months))
+    _auto = load_or_bootstrap_data(DEFAULT_YEARS, DEFAULT_MONTHS)
     if not _auto.empty:
         st.session_state['data'] = _auto
 

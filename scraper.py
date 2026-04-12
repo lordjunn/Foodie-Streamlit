@@ -15,10 +15,18 @@ from helpers import (
 )
 
 
+DEFAULT_IMG = "https://i.ytimg.com/vi/geOCvzwdt-s/maxresdefault.jpg"
+
+
 # ---------- HELPERS ----------
 def _build_urls(years, months):
     base_url = "https://lordjunn.github.io/Food-MMU/Logs/"
     return [f"{base_url}{month} {year}.html" for year in years for month in months]
+
+
+def _build_urls_from_pairs(year_month_pairs):
+    base_url = "https://lordjunn.github.io/Food-MMU/Logs/"
+    return [f"{base_url}{month} {year}.html" for year, month in year_month_pairs]
 
 
 def _parse_page(soup, page_url):
@@ -57,7 +65,7 @@ def _parse_page(soup, page_url):
 
             # --- Extract food image URL ---
             image_tag = item.find('img', class_='menu-item-image')
-            image_url = None
+            image_url = DEFAULT_IMG
             if image_tag and image_tag.get('src'):
                 src = image_tag['src']
                 if not src.startswith(('http://', 'https://')):
@@ -82,6 +90,22 @@ def _parse_page(soup, page_url):
 def scrape_data_raw(years, months):
     """Scrape without Streamlit UI elements. Safe for caching."""
     urls = _build_urls(years, months)
+    menu_items = []
+    for url in urls:
+        try:
+            response = requests.get(url, timeout=15)
+            if response.status_code != 200:
+                continue
+            soup = BeautifulSoup(response.text, 'html.parser')
+            menu_items.extend(_parse_page(soup, url))
+        except Exception:
+            pass
+    return pd.DataFrame(menu_items)
+
+
+def scrape_data_raw_pairs(year_month_pairs):
+    """Scrape year-month tuples directly, e.g. [(26, 'Apr'), (26, 'May')]."""
+    urls = _build_urls_from_pairs(year_month_pairs)
     menu_items = []
     for url in urls:
         try:

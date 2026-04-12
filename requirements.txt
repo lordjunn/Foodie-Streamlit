@@ -12,6 +12,7 @@ prophet
 cmdstanpy
 scikit-learn
 
+# Note: SQLite caching uses Python stdlib sqlite3 (no extra package needed)
 rich==14.2.0
 markdown-it-py==4.0.0
 pygments==2.19.2
