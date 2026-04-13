@@ -55,8 +55,10 @@ A full-featured **Streamlit** web application that scrapes, cleans, explores, an
 
 ### 💾 Persistent Data Cache (SQLite)
 - App now loads from local SQLite DB first (`food_log_cache.db`)
-- If DB already has data, scraping runs incrementally from the latest month in DB onward
-- Example: if latest DB date is `2026-04-06`, scrape will only target `Apr 26` (and later requested months), not earlier months
+- If DB already has data, scraping runs incrementally on both edges of cached history:
+  - backfill older months up to the earliest cached month
+  - fetch newer months from the latest cached month onward
+- Example: if DB range is Jan 2026 to Apr 2026 and you request all 2026 months, scraper targets Jan/earlier edge + Apr/later edge months, while skipping fully interior months
 - If DB is empty, app auto-scrapes using default preloaded settings and then saves to DB
 - In-memory Streamlit cache clear does not delete the SQLite DB
 

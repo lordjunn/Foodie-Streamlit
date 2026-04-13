@@ -95,21 +95,48 @@ def get_latest_date_from_df(df: pd.DataFrame):
     return parsed.max()
 
 
+def get_earliest_date_from_df(df: pd.DataFrame):
+    if df is None or df.empty or "date" not in df.columns:
+        return None
+    parsed = pd.to_datetime(df["date"], errors="coerce")
+    if parsed.dropna().empty:
+        return None
+    return parsed.min()
+
+
 def build_year_month_pairs(years, months):
     pairs = [(int(y), m) for y in years for m in months if m in MONTH_TO_NUM]
     return sorted(pairs, key=lambda x: (x[0], MONTH_TO_NUM[x[1]]))
 
 
-def filter_incremental_pairs(year_month_pairs, latest_date):
-    if latest_date is None:
+def filter_incremental_pairs(year_month_pairs, earliest_date=None, latest_date=None):
+    if earliest_date is None and latest_date is None:
         return year_month_pairs
 
-    latest_key = (int(latest_date.year) % 100, int(latest_date.month))
+    earliest_key = None
+    latest_key = None
+    if earliest_date is not None:
+        earliest_key = (int(earliest_date.year) % 100, int(earliest_date.month))
+    if latest_date is not None:
+        latest_key = (int(latest_date.year) % 100, int(latest_date.month))
+
     incremental = []
     for year, month_name in year_month_pairs:
         month_num = MONTH_TO_NUM.get(month_name)
         if month_num is None:
             continue
-        if (year, month_num) >= latest_key:
+
+        pair_key = (year, month_num)
+        should_scrape = False
+
+        # If cached data starts mid-history, backfill months up to and including the earliest month.
+        if earliest_key is not None and pair_key <= earliest_key:
+            should_scrape = True
+
+        # Keep current behavior for new trailing data from the latest cached month onward.
+        if latest_key is not None and pair_key >= latest_key:
+            should_scrape = True
+
+        if should_scrape:
             incremental.append((year, month_name))
     return incremental

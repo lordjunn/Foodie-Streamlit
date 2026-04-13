@@ -28,6 +28,7 @@ from db import (
     load_data_from_db,
     save_data_to_db,
     merge_with_existing_and_save,
+    get_earliest_date_from_df,
     get_latest_date_from_df,
     build_year_month_pairs,
     filter_incremental_pairs,
@@ -72,13 +73,18 @@ def load_or_bootstrap_data(default_years, default_months):
 
 def run_incremental_scrape(requested_years, requested_months):
     existing_df = apply_default_image(load_data_from_db())
+    earliest_date = get_earliest_date_from_df(existing_df)
     latest_date = get_latest_date_from_df(existing_df)
     all_pairs = build_year_month_pairs(requested_years, requested_months)
 
-    if latest_date is None:
+    if earliest_date is None and latest_date is None:
         scrape_pairs = all_pairs
     else:
-        scrape_pairs = filter_incremental_pairs(all_pairs, latest_date)
+        scrape_pairs = filter_incremental_pairs(
+            all_pairs,
+            earliest_date=earliest_date,
+            latest_date=latest_date,
+        )
 
     if not scrape_pairs:
         st.info("DB is already up to date for your selected months.")
