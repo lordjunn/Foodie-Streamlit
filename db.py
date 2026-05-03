@@ -1,10 +1,11 @@
-import sqlite3
 from pathlib import Path
 
 import pandas as pd
+import numpy as np
+import re
+from dateutil import parser
 
-DB_PATH = Path(__file__).resolve().parent / "food_log_cache.db"
-TABLE_NAME = "menu_items"
+CSV_PATH = Path(__file__).resolve().parent / "food.csv"
 MONTH_TO_NUM = {
     "Jan": 1,
     "Feb": 2,
@@ -20,69 +21,102 @@ MONTH_TO_NUM = {
     "Dec": 12,
 }
 
-
-def init_db(db_path: Path = DB_PATH):
-    with sqlite3.connect(db_path) as conn:
-        conn.execute(
-            f"""
-            CREATE TABLE IF NOT EXISTS {TABLE_NAME} (
-                date TEXT,
-                dish_name TEXT,
-                restaurant_name TEXT,
-                price TEXT,
-                numeric_price REAL,
-                meal_type TEXT,
-                description TEXT,
-                image_url TEXT
-            )
-            """
-        )
+STANDARD_COLUMNS = [
+    "date",
+    "dish_name",
+    "restaurant_name",
+    "price",
+    "numeric_price",
+    "meal_type",
+    "description",
+    "image_url",
+]
 
 
-def load_data_from_db(db_path: Path = DB_PATH) -> pd.DataFrame:
-    if not db_path.exists():
-        return pd.DataFrame()
+def _parse_price(text):
+    if text is None or (isinstance(text, float) and np.isnan(text)):
+        return np.nan
 
-    with sqlite3.connect(db_path) as conn:
-        try:
-            df = pd.read_sql_query(f"SELECT * FROM {TABLE_NAME}", conn)
-        except Exception:
-            return pd.DataFrame()
+    text_clean = str(text).strip().lower().replace(",", "")
+    if not text_clean or text_clean == "no price":
+        return np.nan
 
-    if df.empty:
-        return df
+    match = re.search(r"(\d+(?:\.\d+)?)", text_clean)
+    if match:
+        return float(match.group(1))
 
-    if "date" in df.columns:
-        df["date"] = pd.to_datetime(df["date"], errors="coerce")
-
-    return df
+    if "free" in text_clean:
+        return 0.0
+    return np.nan
 
 
-def save_data_to_db(df: pd.DataFrame, db_path: Path = DB_PATH):
+def _parse_date(value):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return pd.NaT
+    try:
+        return parser.parse(str(value), dayfirst=True, fuzzy=True)
+    except Exception:
+        return pd.NaT
+
+
+def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:
+    if df is None or df.empty:
+        return pd.DataFrame(columns=STANDARD_COLUMNS)
+
+    out = df.copy()
+
+    if "image" in out.columns and "image_url" not in out.columns:
+        out = out.rename(columns={"image": "image_url"})
+
+    for col in STANDARD_COLUMNS:
+        if col not in out.columns:
+            out[col] = np.nan
+
+    out["date"] = out["date"].apply(_parse_date)
+
+    if "numeric_price" in out.columns:
+        out["numeric_price"] = pd.to_numeric(out["numeric_price"], errors="coerce")
+    out["numeric_price"] = out["numeric_price"].fillna(out["price"].apply(_parse_price))
+
+    out = out[STANDARD_COLUMNS]
+    out = out.drop_duplicates()
+    out = out.sort_values("date", ascending=True, na_position="last")
+    return out
+
+
+def init_db(csv_path: Path = CSV_PATH):
+    if csv_path.exists():
+        return
+    pd.DataFrame(columns=STANDARD_COLUMNS).to_csv(csv_path, index=False)
+
+
+def load_data_from_db(csv_path: Path = CSV_PATH) -> pd.DataFrame:
+    if not csv_path.exists():
+        return pd.DataFrame(columns=STANDARD_COLUMNS)
+    try:
+        raw = pd.read_csv(csv_path)
+    except Exception:
+        return pd.DataFrame(columns=STANDARD_COLUMNS)
+    return _normalize_df(raw)
+
+
+def save_data_to_db(df: pd.DataFrame, csv_path: Path = CSV_PATH):
     if df is None or df.empty:
         return
 
-    to_save = df.copy()
-    if "date" in to_save.columns:
-        to_save["date"] = pd.to_datetime(to_save["date"], errors="coerce")
-
-    with sqlite3.connect(db_path) as conn:
-        to_save.to_sql(TABLE_NAME, conn, if_exists="replace", index=False)
+    to_save = _normalize_df(df)
+    to_save.to_csv(csv_path, index=False)
 
 
-def merge_with_existing_and_save(new_df: pd.DataFrame, db_path: Path = DB_PATH) -> pd.DataFrame:
+def merge_with_existing_and_save(new_df: pd.DataFrame, csv_path: Path = CSV_PATH) -> pd.DataFrame:
     if new_df is None or new_df.empty:
-        return load_data_from_db(db_path)
+        return load_data_from_db(csv_path)
 
-    existing = load_data_from_db(db_path)
+    existing = load_data_from_db(csv_path)
     combined = pd.concat([existing, new_df], ignore_index=True)
-    combined = combined.drop_duplicates()
+    combined = _normalize_df(combined)
 
-    if "date" in combined.columns:
-        combined["date"] = pd.to_datetime(combined["date"], errors="coerce")
-        combined = combined.sort_values("date", ascending=True, na_position="last")
-
-    save_data_to_db(combined, db_path)
+    save_data_to_db(combined, csv_path)
     return combined
 
 

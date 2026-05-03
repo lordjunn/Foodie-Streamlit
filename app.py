@@ -87,10 +87,10 @@ def run_incremental_scrape(requested_years, requested_months):
         )
 
     if not scrape_pairs:
-        st.info("DB is already up to date for your selected months.")
+        st.info("CSV cache is already up to date for your selected months.")
         return existing_df
 
-    with st.spinner(f"Scraping {len(scrape_pairs)} month(s) not fully cached in DB..."):
+    with st.spinner(f"Scraping {len(scrape_pairs)} month(s) not fully cached in CSV..."):
         scraped_df = apply_default_image(scrape_data_raw_pairs(scrape_pairs))
 
     if scraped_df.empty:
@@ -98,7 +98,7 @@ def run_incremental_scrape(requested_years, requested_months):
         return existing_df
 
     merged_df = apply_default_image(merge_with_existing_and_save(scraped_df))
-    st.success(f"✅ Added {len(scraped_df)} scraped rows. DB now has {len(merged_df)} rows.")
+    st.success(f"✅ Added {len(scraped_df)} scraped rows. CSV cache now has {len(merged_df)} rows.")
     return merged_df
 
 # ---------- FILTER & EXPLORE ----------
@@ -143,7 +143,7 @@ clear_cache = st.sidebar.button("🗑️ Clear Cache")
 
 if clear_cache:
     st.cache_data.clear()
-    st.toast("In-memory cache cleared (DB is kept).")
+    st.toast("In-memory cache cleared (CSV cache is kept).")
 
 init_db()
 
