@@ -167,44 +167,46 @@ if 'data' in st.session_state:
     # Ensure date column is datetime
     df['date'] = pd.to_datetime(df['date'], errors='coerce')
 
-    # --- Filters in 4 columns ---
-    col1, col2, col3, col4 = st.columns([2,2,2,3])  # Adjust widths for better layout
-    with col1:
-        rest_filter = st.multiselect(
-            "Filter by Restaurant", 
-            options=sorted(df['restaurant_name'].dropna().unique().tolist())
-        )
-    with col2:
-        meal_filter = st.multiselect(
-            "Filter by Meal Type", 
-            options=sorted(df['meal_type'].dropna().unique().tolist())
-        )
-    with col3:
-        search = st.text_input("Search Dish Name")
-    with col4:
-        min_date = df['date'].min()
-        max_date = df['date'].max()
-        date_range = st.date_input(
-            "Filter by Date",
-            value=(min_date, max_date),
-            min_value=min_date,
-            max_value=max_date
-        )
+    # --- Filters kept in one collapsible block to reduce page noise ---
+    with st.expander("Filters", expanded=False):
+        col1, col2, col3, col4 = st.columns([2, 2, 2, 3])
+        with col1:
+            rest_filter = st.multiselect(
+                "Filter by Restaurant",
+                options=sorted(df['restaurant_name'].dropna().unique().tolist())
+            )
+        with col2:
+            meal_filter = st.multiselect(
+                "Filter by Meal Type",
+                options=sorted(df['meal_type'].dropna().unique().tolist())
+            )
+        with col3:
+            search = st.text_input("Search Dish Name")
+        with col4:
+            min_date = df['date'].min()
+            max_date = df['date'].max()
+            date_range = st.date_input(
+                "Filter by Date",
+                value=(min_date, max_date),
+                min_value=min_date,
+                max_value=max_date,
+                format="DD/MM/YYYY"
+            )
 
-    # --- Apply filters ---
-    filtered_df = filter_data(df, rest_filter, meal_filter, search)
+        # --- Apply filters ---
+        filtered_df = filter_data(df, rest_filter, meal_filter, search)
 
-    # NEW — Zero-value filter
-    ignore_zero = st.checkbox("Ignore zero or near-zero prices (numeric_price < 0.01)", value=False)
-    if ignore_zero:
-        filtered_df = filtered_df[filtered_df['numeric_price'] >= 0.01]
+        # NEW — Zero-value filter
+        ignore_zero = st.checkbox("Ignore zero or near-zero prices (numeric_price < 0.01)", value=False)
+        if ignore_zero:
+            filtered_df = filtered_df[filtered_df['numeric_price'] >= 0.01]
 
-    # Date range filter
-    if isinstance(date_range, tuple) and len(date_range) == 2:
-        start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
-        filtered_df = filtered_df[
-            (filtered_df['date'] >= start_date) & (filtered_df['date'] <= end_date)
-        ]
+        # Date range filter
+        if isinstance(date_range, tuple) and len(date_range) == 2:
+            start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
+            filtered_df = filtered_df[
+                (filtered_df['date'] >= start_date) & (filtered_df['date'] <= end_date)
+            ]
 
     # [IMPROVEMENT] KPI Metrics
     if not filtered_df.empty:
@@ -350,7 +352,12 @@ if 'data' in st.session_state:
                                 f"{most_ordered.iloc[0]} times")
 
     with tab1:
-        st.dataframe(filtered_df)
+        display_df = filtered_df.copy()
+        if "date" in display_df.columns:
+            display_df["date"] = pd.to_datetime(
+                display_df["date"], errors="coerce"
+            ).dt.strftime("%d/%m/%Y")
+        st.dataframe(display_df)
         csv = convert_df(filtered_df)
         st.download_button("💾 Download Filtered CSV", csv, "filtered_menu_items.csv", "text/csv")
     

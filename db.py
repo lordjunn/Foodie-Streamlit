@@ -6,6 +6,7 @@ import re
 from dateutil import parser
 
 CSV_PATH = Path(__file__).resolve().parent / "food.csv"
+IMAGE_BASE_URL = "https://lordjunn.github.io/Food-MMU/Logs/"
 MONTH_TO_NUM = {
     "Jan": 1,
     "Feb": 2,
@@ -59,6 +60,20 @@ def _parse_date(value):
         return pd.NaT
 
 
+def _normalize_image_url(value):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return np.nan
+
+    image_url = str(value).strip()
+    if not image_url:
+        return np.nan
+
+    if image_url.startswith(("http://", "https://")):
+        return image_url
+
+    return IMAGE_BASE_URL + image_url.lstrip('/').replace('\\', '/')
+
+
 def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:
     if df is None or df.empty:
         return pd.DataFrame(columns=STANDARD_COLUMNS)
@@ -77,6 +92,7 @@ def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:
     if "numeric_price" in out.columns:
         out["numeric_price"] = pd.to_numeric(out["numeric_price"], errors="coerce")
     out["numeric_price"] = out["numeric_price"].fillna(out["price"].apply(_parse_price))
+    out["image_url"] = out["image_url"].apply(_normalize_image_url)
 
     out = out[STANDARD_COLUMNS]
     out = out.drop_duplicates()
