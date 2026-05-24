@@ -115,6 +115,57 @@ def render_data_stats(filtered_df, convert_df):
             ).map(_highlight_change, subset=["Δ Avg", "% Change Avg"])
         )
 
+    st.subheader("🏆 Top Restaurants and Dishes")
+    if not filtered_df.empty:
+        count_df = filtered_df.dropna(subset=["date"]).copy()
+        if not count_df.empty:
+            count_df["year_month"] = count_df["date"].dt.to_period("M").astype(str)
+            total_meals = len(count_df)
+
+            top_n = 10
+
+            rest_total = count_df["restaurant_name"].value_counts().rename("Total Orders")
+            rest_monthly = (
+                count_df.groupby(["restaurant_name", "year_month"])\
+                .size()
+                .rename("Monthly Orders")
+            )
+            rest_max = rest_monthly.groupby("restaurant_name").max().rename("Max in Month")
+            rest_table = pd.concat([rest_total, rest_max], axis=1).fillna(0)
+            rest_table["Share %"] = (rest_table["Total Orders"] / total_meals * 100).round(2)
+            rest_table = rest_table.reset_index().rename(columns={"index": "Restaurant"})
+            rest_table["Total Orders"] = rest_table["Total Orders"].astype(int)
+            rest_table["Max in Month"] = rest_table["Max in Month"].astype(int)
+            rest_table = rest_table.sort_values("Total Orders", ascending=False).head(top_n)
+
+            dish_total = count_df["dish_name"].value_counts().rename("Total Orders")
+            dish_monthly = (
+                count_df.groupby(["dish_name", "year_month"])\
+                .size()
+                .rename("Monthly Orders")
+            )
+            dish_max = dish_monthly.groupby("dish_name").max().rename("Max in Month")
+            dish_table = pd.concat([dish_total, dish_max], axis=1).fillna(0)
+            dish_table["Share %"] = (dish_table["Total Orders"] / total_meals * 100).round(2)
+            dish_table = dish_table.reset_index().rename(columns={"index": "Dish"})
+            dish_table["Total Orders"] = dish_table["Total Orders"].astype(int)
+            dish_table["Max in Month"] = dish_table["Max in Month"].astype(int)
+            dish_table = dish_table.sort_values("Total Orders", ascending=False).head(top_n)
+
+            col_left, col_right = st.columns(2)
+            with col_left:
+                st.markdown("### 🏠 Top Restaurants")
+                st.dataframe(
+                    rest_table.style.format({"Share %": "{:.2f}%"})
+                )
+            with col_right:
+                st.markdown("### 🍜 Top Dishes")
+                st.dataframe(
+                    dish_table.style.format({"Share %": "{:.2f}%"})
+                )
+        else:
+            st.info("Not enough dated entries to build top lists.")
+
     st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
     if not filtered_df.empty and "numeric_price" in filtered_df.columns:
         lowess_source = filtered_df.copy()
