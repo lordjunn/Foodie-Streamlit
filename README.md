@@ -53,14 +53,14 @@ A full-featured **Streamlit** web application that scrapes, cleans, explores, an
 - Optional price trend overlay (top 15 most ordered)
 - Default fallback image is shown whenever a dish has no image URL
 
-### 💾 Persistent Data Cache (SQLite)
-- App now loads from local SQLite DB first (`food_log_cache.db`)
-- If DB already has data, scraping runs incrementally on both edges of cached history:
-  - backfill older months up to the earliest cached month
+### 💾 Persistent Data Cache (CSV)
+- App loads from local CSV first (`food.csv`)
+- If CSV already has data, scraping runs incrementally on both edges of cached history:
+  - backfill older months before the earliest cached month
   - fetch newer months from the latest cached month onward
-- Example: if DB range is Jan 2026 to Apr 2026 and you request all 2026 months, scraper targets Jan/earlier edge + Apr/later edge months, while skipping fully interior months
-- If DB is empty, app auto-scrapes using default preloaded settings and then saves to DB
-- In-memory Streamlit cache clear does not delete the SQLite DB
+- Example: if CSV range is Jan 2026 to Apr 2026 and you request all 2026 months, scraper targets Jan/earlier edge + Apr/later edge months, while skipping fully interior months
+- If CSV is empty, app auto-scrapes using default preloaded settings and then saves to CSV
+- In-memory Streamlit cache clear does not delete the CSV cache
 
 ### ℹ️ About & Data Dictionary
 - Project description, tech stack, and methodology
@@ -79,7 +79,7 @@ A full-featured **Streamlit** web application that scrapes, cleans, explores, an
 | Visualization | Plotly, Seaborn |
 | Forecasting | Prophet, ARIMA (statsmodels), Exponential Smoothing, Scikit-learn |
 | Statistics | SciPy |
-| Local Persistence | SQLite (Python stdlib `sqlite3`) |
+| Local Persistence | CSV (`food.csv`) |
 
 ---
 
@@ -114,16 +114,36 @@ The app will open at `http://localhost:8501`.
 Foodie-Streamlit/
 ├── .streamlit/
 │   └── config.toml        # Theme configuration (dark/light mode)
-├── app.py                  # Main Streamlit application
+├── app.py                  # Main Streamlit entry point (thin orchestrator)
+├── services/
+│   └── data_service.py     # Scrape/load helpers and CSV cache logic
+├── ui/
+│   ├── filters.py          # Filter widgets + date range logic
+│   └── metrics.py          # KPI metric row
+├── tabs/
+│   ├── dashboard.py        # Dashboard tab renderer
+│   ├── data_stats.py       # Data & stats tab renderer
+│   ├── visualizations.py   # Visualization tab renderer
+│   ├── forecasting_tab.py  # Forecasting tab renderer
+│   ├── food_gallery.py     # Food gallery tab renderer
+│   ├── compare.py          # Month-to-month comparison tab renderer
+│   └── about.py            # About tab renderer
 ├── scraper.py              # Web scraper (with and without progress bar)
-├── db.py                   # SQLite read/write + incremental month logic
+├── db.py                   # CSV read/write + incremental month logic
 ├── helpers.py              # Utility functions (parsing, normalization)
 ├── forecasting.py          # Forecasting models (Prophet, LR, ETS, ARIMA)
 ├── plots.py                # Plotly chart builders
-├── food_log_cache.db       # Local cache DB (created at runtime)
+├── food.csv                # Local cache (created at runtime)
 ├── requirements.txt        # Python dependencies
+├── CODE_GUIDE.md           # How the codebase is organized
 └── README.md
 ```
+
+---
+
+## 🧭 Code Guide
+
+See [CODE_GUIDE.md](CODE_GUIDE.md) for a walkthrough of the modules and data flow.
 
 ---
 
