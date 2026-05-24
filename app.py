@@ -279,7 +279,7 @@ if 'data' in st.session_state:
                     legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
                     height=400
                 )
-                st.plotly_chart(fig_trend, use_container_width=True)
+                st.plotly_chart(fig_trend, width="stretch")
 
             # --- Top Restaurants + Top Dishes ---
             col_l, col_r = st.columns(2)
@@ -290,7 +290,7 @@ if 'data' in st.session_state:
                 fig_rest = px.bar(top_rest, x='Visits', y='Restaurant', orientation='h',
                                   color='Visits', color_continuous_scale='Blues')
                 fig_rest.update_layout(yaxis=dict(autorange='reversed'), height=400, showlegend=False)
-                st.plotly_chart(fig_rest, use_container_width=True)
+                st.plotly_chart(fig_rest, width="stretch")
 
             with col_r:
                 st.subheader("🍜 Top 10 Most Ordered Dishes")
@@ -299,7 +299,7 @@ if 'data' in st.session_state:
                 fig_dish = px.bar(top_dish, x='Orders', y='Dish', orientation='h',
                                   color='Orders', color_continuous_scale='Oranges')
                 fig_dish.update_layout(yaxis=dict(autorange='reversed'), height=400, showlegend=False)
-                st.plotly_chart(fig_dish, use_container_width=True)
+                st.plotly_chart(fig_dish, width="stretch")
 
             # --- Day of Week + Meal Type ---
             col_dow, col_mt = st.columns(2)
@@ -314,7 +314,7 @@ if 'data' in st.session_state:
                                      labels={'x': 'Day', 'y': 'Meals'},
                                      color=dow_counts.values, color_continuous_scale='Viridis')
                     fig_dow.update_layout(height=350, showlegend=False)
-                    st.plotly_chart(fig_dow, use_container_width=True)
+                    st.plotly_chart(fig_dow, width="stretch")
 
             with col_mt:
                 st.subheader("🍽️ Meal Type Distribution")
@@ -322,7 +322,7 @@ if 'data' in st.session_state:
                 if not mt_counts.empty:
                     fig_mt = px.pie(values=mt_counts.values, names=mt_counts.index, hole=0.4)
                     fig_mt.update_layout(height=350)
-                    st.plotly_chart(fig_mt, use_container_width=True)
+                    st.plotly_chart(fig_mt, width="stretch")
 
             # --- Personal Records ---
             st.markdown("---")
@@ -583,7 +583,7 @@ if 'data' in st.session_state:
                 # [IMPROVEMENT] Activity Heatmap
                 st.subheader("📅 Eating Habits Heatmap")
                 fig_cal = plots.plot_calendar_heatmap(filtered_df)
-                st.plotly_chart(fig_cal, use_container_width=True)
+                st.plotly_chart(fig_cal, width="stretch")
 
     with tab3:
         st.subheader("🔮 Forecast Next Month Prices")
@@ -645,7 +645,7 @@ if 'data' in st.session_state:
             if forecasts:
                 st.markdown("### 📊 Model Comparison")
                 fig_compare = plots.plot_forecast_comparison(forecasts)
-                st.plotly_chart(fig_compare, use_container_width=True)
+                st.plotly_chart(fig_compare, width="stretch")
                 
                 # Individual model plots
                 st.markdown("### 📈 Individual Model Forecasts")
@@ -653,7 +653,7 @@ if 'data' in st.session_state:
                     with st.expander(f"{model_name} Details", expanded=False):
                         fig = plots.plot_forecast(forecast_df)
                         fig.update_layout(title=f"{model_name} Forecast")
-                        st.plotly_chart(fig, use_container_width=True)
+                        st.plotly_chart(fig, width="stretch")
                         
                         # Show forecast table
                         st.dataframe(
@@ -766,7 +766,7 @@ if 'data' in st.session_state:
                         legend_title="Dish [Restaurant]",
                         height=500,
                     )
-                    st.plotly_chart(_fig, use_container_width=True)
+                    st.plotly_chart(_fig, width="stretch")
 
             # --- Gallery display ---
             st.caption(f"Showing {len(gallery_df)} entries")
@@ -796,7 +796,7 @@ if 'data' in st.session_state:
                                 with ci:
                                     img = r.get("image_url")
                                     if pd.notna(img) and img:
-                                        st.image(img, use_container_width=True)
+                                        st.image(img, width="stretch")
                                     else:
                                         st.markdown("🍽️ *No image*")
                                 with ct:
@@ -831,7 +831,7 @@ if 'data' in st.session_state:
                             with ci:
                                 img = r.get("image_url")
                                 if pd.notna(img) and img:
-                                    st.image(img, use_container_width=True)
+                                    st.image(img, width="stretch")
                                 else:
                                     st.markdown("🍽️ *No image*")
                             with ct:
@@ -871,7 +871,7 @@ if 'data' in st.session_state:
                                     img = row.get("image_url")
                                     if pd.notna(img) and img:
                                         st.image(
-                                            img, use_container_width=True
+                                            img, width="stretch"
                                         )
                                     d = (
                                         row["date"].strftime("%d %b %Y")
@@ -951,7 +951,7 @@ if 'data' in st.session_state:
                     barmode='overlay', xaxis_title='Price (RM)',
                     yaxis_title='Count', height=400
                 )
-                st.plotly_chart(fig_comp, use_container_width=True)
+                st.plotly_chart(fig_comp, width="stretch")
 
                 # --- Top Restaurants Comparison ---
                 st.subheader("🏆 Top Restaurants Comparison")
@@ -960,12 +960,12 @@ if 'data' in st.session_state:
                     st.markdown(f"**{month_a}**")
                     rest_a_counts = df_a['restaurant_name'].value_counts().head(5).reset_index()
                     rest_a_counts.columns = ['Restaurant', 'Visits']
-                    st.dataframe(rest_a_counts, use_container_width=True, hide_index=True)
+                    st.dataframe(rest_a_counts, width="stretch", hide_index=True)
                 with cr2:
                     st.markdown(f"**{month_b}**")
                     rest_b_counts = df_b['restaurant_name'].value_counts().head(5).reset_index()
                     rest_b_counts.columns = ['Restaurant', 'Visits']
-                    st.dataframe(rest_b_counts, use_container_width=True, hide_index=True)
+                    st.dataframe(rest_b_counts, width="stretch", hide_index=True)
 
                 # --- Meal Type Comparison ---
                 st.subheader("🍽️ Meal Type Comparison")
@@ -974,12 +974,12 @@ if 'data' in st.session_state:
                     mt_a = df_a['meal_type'].value_counts()
                     fig_ma = px.pie(values=mt_a.values, names=mt_a.index,
                                     title=month_a, hole=0.4)
-                    st.plotly_chart(fig_ma, use_container_width=True)
+                    st.plotly_chart(fig_ma, width="stretch")
                 with cm2:
                     mt_b = df_b['meal_type'].value_counts()
                     fig_mb = px.pie(values=mt_b.values, names=mt_b.index,
                                     title=month_b, hole=0.4)
-                    st.plotly_chart(fig_mb, use_container_width=True)
+                    st.plotly_chart(fig_mb, width="stretch")
         else:
             st.info("Not enough data for comparison. Adjust filters or scrape more data.")
 

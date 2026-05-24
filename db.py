@@ -207,8 +207,8 @@ def filter_incremental_pairs(year_month_pairs, earliest_date=None, latest_date=N
         pair_key = (year, month_num)
         should_scrape = False
 
-        # If cached data starts mid-history, backfill months up to and including the earliest month.
-        if earliest_key is not None and pair_key <= earliest_key:
+        # If cached data starts mid-history, backfill months strictly before the earliest month.
+        if earliest_key is not None and pair_key < earliest_key:
             should_scrape = True
 
         # Keep current behavior for new trailing data from the latest cached month onward.
