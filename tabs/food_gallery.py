@@ -4,7 +4,7 @@ import plotly.express as px
 
 
 def render_food_gallery(filtered_df, default_img):
-    image_width = 220
+    image_width = 400
     st.header("🍽️ Food Gallery")
 
     if filtered_df is None or filtered_df.empty:
