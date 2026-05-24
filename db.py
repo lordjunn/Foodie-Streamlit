@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import re
 from dateutil import parser
+from datetime import date, datetime
 
 CSV_PATH = Path(__file__).resolve().parent / "food.csv"
 IMAGE_BASE_URL = "https://lordjunn.github.io/Food-MMU/Logs/"
@@ -55,9 +56,13 @@ def _parse_date(value):
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return pd.NaT
     try:
+        if isinstance(value, (pd.Timestamp, datetime, date)):
+            return pd.to_datetime(value)
         text_value = str(value).strip()
         if re.match(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$", text_value):
             return parser.parse(text_value, yearfirst=True, dayfirst=False)
+        if re.match(r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$", text_value):
+            return parser.parse(text_value, dayfirst=False)
         return parser.parse(text_value, dayfirst=True, fuzzy=True)
     except Exception:
         return pd.NaT

@@ -31,6 +31,12 @@ def _build_urls_from_pairs(year_month_pairs):
 
 def _parse_page(soup, page_url):
     """Parse a single page's BeautifulSoup into a list of item dicts."""
+    def _parse_date_heading(date_text):
+        cleaned = date_text.strip()
+        if re.match(r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$", cleaned):
+            return parser.parse(cleaned, dayfirst=False)
+        return parser.parse(cleaned, dayfirst=True)
+
     items = []
     for menu_div in soup.find_all('div', class_='menu'):
         if menu_div.find('div', id='footer-container'):
@@ -43,7 +49,12 @@ def _parse_page(soup, page_url):
             if re.match(r'\d{1,2}\s+\w+\s+\d{4}', date_str):
                 date_str = re.sub(r'\s*\(.*?\)', '', date_str)
                 try:
-                    date_obj = parser.parse(date_str, dayfirst=True)
+                    date_obj = _parse_date_heading(date_str)
+                except Exception:
+                    continue
+            elif re.match(r"^\d{1,2}[-/]\d{1,2}[-/]\d{2,4}$", date_str):
+                try:
+                    date_obj = _parse_date_heading(date_str)
                 except Exception:
                     continue
             else:
