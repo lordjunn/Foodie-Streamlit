@@ -356,8 +356,16 @@ if 'data' in st.session_state:
         if "date" in display_df.columns:
             display_df["date"] = pd.to_datetime(
                 display_df["date"], errors="coerce"
-            ).dt.strftime("%d/%m/%Y")
-        st.dataframe(display_df)
+            )
+        st.dataframe(
+            display_df,
+            column_config={
+                "date": st.column_config.DateColumn(
+                    "date",
+                    format="DD/MM/YYYY",
+                )
+            },
+        )
         csv = convert_df(filtered_df)
         st.download_button("💾 Download Filtered CSV", csv, "filtered_menu_items.csv", "text/csv")
     

@@ -60,6 +60,20 @@ def _parse_date(value):
         return pd.NaT
 
 
+def _clean_text(value):
+    if value is None or (isinstance(value, float) and np.isnan(value)):
+        return np.nan
+    return str(value).strip()
+
+
+def _clean_meal_type(value):
+    cleaned = _clean_text(value)
+    if pd.isna(cleaned):
+        return np.nan
+    cleaned = re.sub(r"^\((.*)\)$", r"\1", cleaned).strip()
+    return cleaned
+
+
 def _normalize_image_url(value):
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return np.nan
@@ -86,6 +100,12 @@ def _normalize_df(df: pd.DataFrame) -> pd.DataFrame:
     for col in STANDARD_COLUMNS:
         if col not in out.columns:
             out[col] = np.nan
+
+    out["dish_name"] = out["dish_name"].apply(_clean_text)
+    out["restaurant_name"] = out["restaurant_name"].apply(_clean_text)
+    out["price"] = out["price"].apply(_clean_text)
+    out["meal_type"] = out["meal_type"].apply(_clean_meal_type)
+    out["description"] = out["description"].apply(_clean_text)
 
     out["date"] = out["date"].apply(_parse_date)
 
