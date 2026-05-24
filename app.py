@@ -165,7 +165,7 @@ if 'data' in st.session_state:
     df = st.session_state['data'].copy()
     
     # Ensure date column is datetime
-    df['date'] = pd.to_datetime(df['date'], errors='coerce')
+    df['date'] = pd.to_datetime(df['date'], errors='coerce', dayfirst=True)
 
     # --- Filters kept in one collapsible block to reduce page noise ---
     with st.expander("Filters", expanded=False):
@@ -203,7 +203,7 @@ if 'data' in st.session_state:
 
         # Date range filter
         if isinstance(date_range, tuple) and len(date_range) == 2:
-            start_date, end_date = pd.to_datetime(date_range[0]), pd.to_datetime(date_range[1])
+            start_date, end_date = pd.to_datetime(date_range[0], dayfirst=True), pd.to_datetime(date_range[1], dayfirst=True)
             filtered_df = filtered_df[
                 (filtered_df['date'] >= start_date) & (filtered_df['date'] <= end_date)
             ]
@@ -355,7 +355,7 @@ if 'data' in st.session_state:
         display_df = filtered_df.copy()
         if "date" in display_df.columns:
             display_df["date"] = pd.to_datetime(
-                display_df["date"], errors="coerce"
+                display_df["date"], errors="coerce", dayfirst=True
             ).dt.strftime("%d/%m/%Y")
         st.dataframe(display_df)
         csv = convert_df(filtered_df)
@@ -429,7 +429,7 @@ if 'data' in st.session_state:
         st.subheader("📊 Monthly LOWESS Summary (by Meal Type)")
         if not filtered_df.empty and 'numeric_price' in filtered_df.columns:
             filtered_df['meal_category'] = filtered_df['meal_type'].apply(normalize_meal_type)
-            filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
+            filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce', dayfirst=True)
             fig_time = plots.plot_prices_over_time(filtered_df)
             
             if fig_time:
@@ -445,7 +445,7 @@ if 'data' in st.session_state:
                     for trace in lowess_traces:
                         # Extract meal type
                         meal_type = trace.name.replace("(lowess)", "").strip()
-                        lowess_x = pd.to_datetime(trace.x)
+                        lowess_x = pd.to_datetime(trace.x, dayfirst=True)
                         lowess_y = trace.y
 
                         lowess_df = pd.DataFrame({
@@ -572,7 +572,7 @@ if 'data' in st.session_state:
                 # --- Prices Over Time ---
                 st.subheader("📅 Prices Over Time")
                 # Ensure date is datetime for plotting
-                filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce')
+                filtered_df['date'] = pd.to_datetime(filtered_df['date'], errors='coerce', dayfirst=True)
                 fig_time = plots.plot_prices_over_time(filtered_df)
                 
                 if fig_time:

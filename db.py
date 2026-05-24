@@ -55,7 +55,10 @@ def _parse_date(value):
     if value is None or (isinstance(value, float) and np.isnan(value)):
         return pd.NaT
     try:
-        return parser.parse(str(value), dayfirst=True, fuzzy=True)
+        text_value = str(value).strip()
+        if re.match(r"^\d{4}[-/]\d{1,2}[-/]\d{1,2}$", text_value):
+            return parser.parse(text_value, yearfirst=True, dayfirst=False)
+        return parser.parse(text_value, dayfirst=True, fuzzy=True)
     except Exception:
         return pd.NaT
 
