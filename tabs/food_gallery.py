@@ -4,6 +4,7 @@ import plotly.express as px
 
 
 def render_food_gallery(filtered_df, default_img):
+    image_width = 220
     st.header("🍽️ Food Gallery")
 
     if filtered_df is None or filtered_df.empty:
@@ -37,8 +38,10 @@ def render_food_gallery(filtered_df, default_img):
             key="gallery_sort",
         )
 
-    gallery_df["image_url"] = gallery_df["image_url"].fillna("")
-    gallery_df.loc[gallery_df["image_url"].str.strip() == "", "image_url"] = default_img
+    gallery_df["image_url"] = gallery_df["image_url"].fillna("").astype(str).str.strip()
+    invalid_mask = ~gallery_df["image_url"].str.startswith(("http://", "https://"))
+    gallery_df.loc[invalid_mask, "image_url"] = ""
+    gallery_df.loc[gallery_df["image_url"] == "", "image_url"] = default_img
 
     if view_mode == "By Dish":
         dish_opts = sorted(gallery_df["dish_name"].dropna().unique())
@@ -118,7 +121,7 @@ def render_food_gallery(filtered_df, default_img):
                     with ci:
                         img = row.get("image_url")
                         if pd.notna(img) and img:
-                            st.image(img, width="stretch")
+                            st.image(img, width=image_width)
                         else:
                             st.markdown("🍽️ *No image*")
                     with ct:
@@ -147,7 +150,7 @@ def render_food_gallery(filtered_df, default_img):
                 with ci:
                     img = row.get("image_url")
                     if pd.notna(img) and img:
-                        st.image(img, width="stretch")
+                        st.image(img, width=image_width)
                     else:
                         st.markdown("🍽️ *No image*")
                 with ct:
@@ -180,7 +183,7 @@ def render_food_gallery(filtered_df, default_img):
                     with col:
                         img = row.get("image_url")
                         if pd.notna(img) and img:
-                            st.image(img, width="stretch")
+                            st.image(img, width=image_width)
                         date_label = (
                             row["date"].strftime("%d %b %Y")
                             if pd.notna(row.get("date"))
