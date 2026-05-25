@@ -122,8 +122,6 @@ def render_data_stats(filtered_df, convert_df):
             count_df["year_month"] = count_df["date"].dt.to_period("M").astype(str)
             total_meals = len(count_df)
 
-            top_n = 10
-
             rest_total = count_df["restaurant_name"].value_counts().rename("Total Orders")
             rest_monthly = (
                 count_df.groupby(["restaurant_name", "year_month"])\
@@ -136,7 +134,7 @@ def render_data_stats(filtered_df, convert_df):
             rest_table = rest_table.reset_index().rename(columns={"index": "Restaurant"})
             rest_table["Total Orders"] = rest_table["Total Orders"].astype(int)
             rest_table["Max in Month"] = rest_table["Max in Month"].astype(int)
-            rest_table = rest_table.sort_values("Total Orders", ascending=False).head(top_n)
+            rest_table = rest_table.sort_values("Total Orders", ascending=False)
 
             dish_total = count_df["dish_name"].value_counts().rename("Total Orders")
             dish_monthly = (
@@ -150,7 +148,30 @@ def render_data_stats(filtered_df, convert_df):
             dish_table = dish_table.reset_index().rename(columns={"index": "Dish"})
             dish_table["Total Orders"] = dish_table["Total Orders"].astype(int)
             dish_table["Max in Month"] = dish_table["Max in Month"].astype(int)
-            dish_table = dish_table.sort_values("Total Orders", ascending=False).head(top_n)
+            dish_table = dish_table.sort_values("Total Orders", ascending=False)
+
+            max_entries = max(len(rest_table), len(dish_table))
+            if max_entries > 0:
+                controls_col, _ = st.columns([1, 3])
+                with controls_col:
+                    show_all = st.checkbox("Show all", value=False, key="top_lists_all")
+                    if show_all:
+                        top_n = max_entries
+                    else:
+                        top_n = st.slider(
+                            "Top list size",
+                            min_value=5,
+                            max_value=max(5, min(50, max_entries)),
+                            value=min(10, max_entries),
+                            step=1,
+                            key="top_lists_size",
+                        )
+            else:
+                top_n = 0
+
+            if top_n:
+                rest_table = rest_table.head(top_n)
+                dish_table = dish_table.head(top_n)
 
             col_left, col_right = st.columns(2)
             with col_left:
