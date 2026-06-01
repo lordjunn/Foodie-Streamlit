@@ -3,6 +3,26 @@
 A full-featured **Streamlit** web application that scrapes, cleans, explores, and forecasts personal food spending data.
 
 [![Streamlit App](https://static.streamlit.io/badges/streamlit_badge_black_white.svg)](https://junn-foodie-data-science.streamlit.app/)
+[![Python](https://img.shields.io/badge/python-3.9%2B-blue)](https://www.python.org/)
+[![Last Commit](https://img.shields.io/github/last-commit/lordjunn/Foodie-Streamlit)](https://github.com/lordjunn/Foodie-Streamlit/commits/main)
+[![License](https://img.shields.io/badge/license-personal%20%2F%20educational-lightgrey)](https://github.com/lordjunn/Foodie-Streamlit)
+
+---
+
+## 🔗 Live Demo
+
+https://junn-foodie-data-science.streamlit.app/
+
+---
+
+## 📸 Screenshots
+
+> Replace the placeholders below with real screenshots or GIFs.
+
+![Dashboard](docs/images/dashboard.png)
+![Forecasting](docs/images/forecasting.png)
+![Food Gallery](docs/images/food-gallery.png)
+![Filtering GIF](docs/images/filtering-demo.gif)
 
 ---
 
@@ -69,6 +89,18 @@ A full-featured **Streamlit** web application that scrapes, cleans, explores, an
 
 ---
 
+## 🌐 Data Source
+
+The scraper pulls monthly food log pages from a public GitHub Pages site:
+
+- Base URL: https://lordjunn.github.io/Food-MMU/Logs/
+- Format: one HTML page per month (e.g., `Apr 2026.html`)
+- Authentication: not required
+
+Because the logs are static HTML, scraping is lightweight and the CSV cache prevents repeated requests.
+
+---
+
 ## 🛠️ Tech Stack
 
 | Component | Technology |
@@ -80,6 +112,31 @@ A full-featured **Streamlit** web application that scrapes, cleans, explores, an
 | Forecasting | Prophet, ARIMA (statsmodels), Exponential Smoothing, Scikit-learn |
 | Statistics | SciPy |
 | Local Persistence | CSV (`food.csv`) |
+
+---
+
+## 🧪 Data Science Techniques
+
+- Time-series forecasting
+- LOWESS smoothing
+- Distribution analysis
+- Normality testing (QQ plot)
+- Descriptive statistics
+- Trend analysis
+- Comparative month-over-month analytics
+
+---
+
+## 🧱 Architecture
+
+```mermaid
+flowchart TD
+  A[Food Log HTML Pages] --> B[Scraper]
+  B --> C[CSV Cache]
+  C --> D[Pandas Processing]
+  D --> E[Visualizations & Forecasting]
+  E --> F[Streamlit UI]
+```
 
 ---
 
@@ -162,6 +219,13 @@ See [CODE_GUIDE.md](CODE_GUIDE.md) for a walkthrough of the modules and data flo
 
 ---
 
+## 📌 Forecasting Notes
+
+> Forecasts are exploratory and intended for educational purposes.
+> Accuracy depends heavily on historical data volume and consistency.
+
+---
+
 ## 🗺️ Roadmap
 
 - [ ] Project restructure (separate `config.py`, `models/`, `services/`, `tests/`)
@@ -170,7 +234,13 @@ See [CODE_GUIDE.md](CODE_GUIDE.md) for a walkthrough of the modules and data flo
 - [ ] Unit tests (pytest) for scraper, price parsing, forecasting
 - [ ] CI/CD (GitHub Actions) — lint, test, deploy
 - [ ] Automatic model selection with time-series cross-validation & leaderboard
+- [ ] Forecast confidence metrics (MAE / RMSE / MAPE)
 - [ ] Anomaly detection (flag unusually expensive meals / price jumps)
+- [ ] Restaurant inflation tracker (avg price changes over time)
+- [ ] Day-of-week analytics (spend + favorites by weekday)
+- [ ] Habit / cohort analysis (repeat vs new restaurants)
+- [ ] Forecast by meal type (breakfast / lunch / dinner)
+- [ ] Natural-language insights (rule-based summary bullets)
 - [ ] Pre-loaded CSV snapshot for instant demo
 
 ---

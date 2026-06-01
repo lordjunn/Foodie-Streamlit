@@ -111,64 +111,73 @@ def render_food_gallery(filtered_df, default_img):
     start = (page - 1) * per_page
     page_df = gallery_df.iloc[start : start + per_page]
 
+    def render_gallery_row(row, show_restaurant):
+        ci, ct = st.columns([1, 2])
+        with ci:
+            img = row.get("image_url")
+            if pd.notna(img) and img:
+                st.image(img, width=image_width)
+            else:
+                st.markdown("🍽️ *No image*")
+
+        with ct:
+            dish_name = row.get("dish_name", "—")
+            if pd.isna(dish_name) or str(dish_name).strip() == "":
+                dish_name = "—"
+
+            price_label = (
+                f"RM {row['numeric_price']:.2f}"
+                if pd.notna(row.get("numeric_price"))
+                else row.get("price", "—")
+            )
+
+            title_col, price_col = st.columns([4, 1])
+            with title_col:
+                st.markdown(f"**{dish_name}**")
+            with price_col:
+                st.markdown(f"**{price_label}**")
+
+            if show_restaurant:
+                rest_name = row.get("restaurant_name", "—")
+                if pd.isna(rest_name) or str(rest_name).strip() == "":
+                    rest_name = "—"
+                st.caption(f"📍 {rest_name}")
+
+            desc = row.get("description", "")
+            if pd.notna(desc) and desc not in ("No description", ""):
+                st.markdown(desc, unsafe_allow_html=True)
+
+            date_value = row.get("date")
+            if pd.notna(date_value):
+                date_label = date_value.strftime("%d %b %Y")
+                day_label = date_value.strftime("%A")
+                full_date = f"{date_label} ({day_label})"
+            else:
+                full_date = "—"
+
+            meal_label = row.get("meal_type", "")
+            if pd.notna(meal_label) and str(meal_label).strip() != "":
+                meta_left, meta_right = st.columns([2, 1])
+                with meta_left:
+                    st.markdown(f"**Date:** {full_date}")
+                with meta_right:
+                    st.markdown(f"**Meal:** {meal_label}")
+            else:
+                st.markdown(f"**Date:** {full_date}")
+
     if view_mode == "By Dish":
         for rest_name, grp in page_df.groupby("restaurant_name", sort=False):
             st.subheader(f"📍 {rest_name}")
             grp = grp.sort_values("date")
             with st.container(height=420):
                 for _, row in grp.iterrows():
-                    ci, ct = st.columns([1, 2])
-                    with ci:
-                        img = row.get("image_url")
-                        if pd.notna(img) and img:
-                            st.image(img, width=image_width)
-                        else:
-                            st.markdown("🍽️ *No image*")
-                    with ct:
-                        date_label = (
-                            row["date"].strftime("%d %b %Y")
-                            if pd.notna(row.get("date"))
-                            else "—"
-                        )
-                        price_label = (
-                            f"RM {row['numeric_price']:.2f}"
-                            if pd.notna(row.get("numeric_price"))
-                            else row.get("price", "—")
-                        )
-                        st.markdown(
-                            f"**{date_label}** · {price_label} · _{row.get('meal_type', '')}_"
-                        )
-                        desc = row.get("description", "")
-                        if pd.notna(desc) and desc not in ("No description", ""):
-                            st.markdown(desc, unsafe_allow_html=True)
+                    render_gallery_row(row, show_restaurant=False)
                     st.divider()
 
     elif view_mode == "By Restaurant":
         with st.container(height=600):
             for _, row in page_df.iterrows():
-                ci, ct = st.columns([1, 2])
-                with ci:
-                    img = row.get("image_url")
-                    if pd.notna(img) and img:
-                        st.image(img, width=image_width)
-                    else:
-                        st.markdown("🍽️ *No image*")
-                with ct:
-                    date_label = (
-                        row["date"].strftime("%d %b %Y")
-                        if pd.notna(row.get("date"))
-                        else "—"
-                    )
-                    price_label = (
-                        f"RM {row['numeric_price']:.2f}"
-                        if pd.notna(row.get("numeric_price"))
-                        else row.get("price", "—")
-                    )
-                    st.markdown(f"**{row['dish_name']}** · {price_label}")
-                    st.caption(f"📅 {date_label} · {row.get('meal_type', '')}")
-                    desc = row.get("description", "")
-                    if pd.notna(desc) and desc not in ("No description", ""):
-                        st.markdown(desc, unsafe_allow_html=True)
+                render_gallery_row(row, show_restaurant=True)
                 st.divider()
 
     else:

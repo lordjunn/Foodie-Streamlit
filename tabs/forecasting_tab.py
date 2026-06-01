@@ -1,10 +1,12 @@
 import streamlit as st
+import pandas as pd
 
 from forecasting import (
     forecast_prices,
     forecast_linear_regression,
     forecast_exponential_smoothing,
     forecast_arima,
+    compute_forecast_metrics,
 )
 import plots
 
@@ -66,6 +68,47 @@ def render_forecasting(filtered_df):
                 st.warning(err)
 
     if forecasts:
+        metrics_rows = []
+        for model_name, forecast_df in forecasts.items():
+            stats = compute_forecast_metrics(forecast_df)
+            metrics_rows.append(
+                {
+                    "Model": model_name,
+                    "MAE": stats["mae"],
+                    "RMSE": stats["rmse"],
+                    "MAPE (%)": stats["mape"],
+                    "N": stats["n"],
+                }
+            )
+
+        metrics_df = pd.DataFrame(metrics_rows).sort_values("RMSE", ascending=True)
+
+        st.markdown("### 📏 Forecast Confidence")
+        st.caption("Metrics are computed on historical months only.")
+        best_df = metrics_df.dropna(subset=["RMSE"]).sort_values("RMSE", ascending=True)
+        if not best_df.empty:
+            best = best_df.iloc[0]
+            best_rmse = "—" if pd.isna(best["RMSE"]) else f"{best['RMSE']:.2f}"
+            best_mae = "—" if pd.isna(best["MAE"]) else f"{best['MAE']:.2f}"
+            best_mape = "—" if pd.isna(best["MAPE (%)"]) else f"{best['MAPE (%)']:.2f}%"
+            st.info(
+                f"Best model by RMSE: {best['Model']} (RMSE {best_rmse}, MAE {best_mae}, MAPE {best_mape})"
+            )
+        else:
+            st.info("Not enough historical data to rank models.")
+        st.dataframe(
+            metrics_df.style.format(
+                {
+                    "MAE": "{:.2f}",
+                    "RMSE": "{:.2f}",
+                    "MAPE (%)": "{:.2f}",
+                    "N": "{:.0f}",
+                },
+                na_rep="—",
+            ),
+            width="stretch",
+        )
+
         st.markdown("### 📊 Model Comparison")
         fig_compare = plots.plot_forecast_comparison(forecasts)
         st.plotly_chart(fig_compare, width="stretch")

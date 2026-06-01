@@ -1,6 +1,30 @@
 import pandas as pd
 import numpy as np
 
+
+def compute_forecast_metrics(forecast_df):
+    """
+    Compute MAE, RMSE, and MAPE over historical rows where both y and yhat exist.
+    """
+    if forecast_df is None or forecast_df.empty:
+        return {"mae": np.nan, "rmse": np.nan, "mape": np.nan, "n": 0}
+
+    df = forecast_df.dropna(subset=["y", "yhat"]).copy()
+    if df.empty:
+        return {"mae": np.nan, "rmse": np.nan, "mape": np.nan, "n": 0}
+
+    errors = df["y"] - df["yhat"]
+    mae = float(np.mean(np.abs(errors)))
+    rmse = float(np.sqrt(np.mean(np.square(errors))))
+
+    non_zero = df["y"].replace(0, np.nan).dropna()
+    if non_zero.empty:
+        mape = np.nan
+    else:
+        mape = float(np.mean(np.abs((df.loc[non_zero.index, "y"] - df.loc[non_zero.index, "yhat"]) / df.loc[non_zero.index, "y"])) * 100)
+
+    return {"mae": mae, "rmse": rmse, "mape": mape, "n": int(len(df))}
+
 def _normalize_freq(freq):
     # Pandas 2.2+ no longer supports 'M' alias; use month-end 'ME' instead.
     return 'ME' if freq == 'M' else freq
