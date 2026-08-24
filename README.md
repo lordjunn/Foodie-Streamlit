@@ -19,9 +19,9 @@ https://junn-foodie-data-science.streamlit.app/
 
 > Replace the placeholders below with real screenshots or GIFs.
 
-![Dashboard](docs/images/dashboard.png)
-![Forecasting](docs/images/forecasting.png)
-![Food Gallery](docs/images/food-gallery.png)
+![Dashboard](images/Dashboard.png)
+![Forecasting](images/Forecasting.png)
+![Food Gallery](images/food-gallery.png)
 ![Filtering GIF](docs/images/filtering-demo.gif)
 
 ---
