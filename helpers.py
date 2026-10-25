@@ -1,17 +1,7 @@
-import streamlit as st
-import requests
-from bs4 import BeautifulSoup
-import pandas as pd
 import re
 import numpy as np
-import matplotlib.pyplot as plt
-import seaborn as sns
-from scipy import stats
-from datetime import datetime
-from dateutil import parser
-import plotly.express as px
-import plotly.figure_factory as ff
-from scipy.stats import norm
+from bs4 import BeautifulSoup
+
 
 def split_dish_and_restaurant(menu_item_name):
     match = re.match(r"([^\[]+)(?:\s*\[\s*([^\]]+)\s*\])?", menu_item_name.strip())
@@ -19,7 +9,8 @@ def split_dish_and_restaurant(menu_item_name):
         dish_name = match.group(1).strip()
         restaurant_name = match.group(2).strip() if match.group(2) else 'No restaurant name'
         return dish_name, restaurant_name
-    return menu_item_name, 'No restaurant name'
+    return menu_item_name.strip(), 'No restaurant name'
+
 
 def preserve_inline_html(element):
     if not element:
@@ -37,6 +28,7 @@ def preserve_inline_html(element):
     result = '\n'.join(line.strip() for line in result.splitlines())
     return result
 
+
 def parse_price(text):
     """
     Extract numeric price for data analysis.
@@ -44,10 +36,12 @@ def parse_price(text):
     - If only 'Free' is mentioned, return 0.0.
     - If nothing valid, return NaN.
     """
-    if not text or text == 'No price':
+    if text is None:
         return np.nan
 
-    text_clean = text.strip().lower().replace(',', '')
+    text_clean = str(text).strip().lower().replace(',', '')
+    if not text_clean or text_clean == 'no price':
+        return np.nan
 
     # If there is a number anywhere (even struck out), use that
     match = re.search(r'(\d+(?:\.\d+)?)', text_clean)
@@ -61,8 +55,11 @@ def parse_price(text):
     # Otherwise missing
     return np.nan
 
+
 def normalize_meal_type(x):
-    x_lower = x.lower()
+    if not x:
+        return "Other"
+    x_lower = str(x).lower()
     if "breakfast" in x_lower:
         return "Breakfast"
     elif "lunch" in x_lower:
@@ -71,4 +68,3 @@ def normalize_meal_type(x):
         return "Dinner"
     else:
         return "Other"
-    
