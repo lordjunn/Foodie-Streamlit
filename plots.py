@@ -17,11 +17,18 @@ def plot_box_price_by_category(df):
     return fig
 
 def plot_qq_normality_check(numeric_prices):
-    sorted_prices = np.sort(numeric_prices)
-    theoretical_quantiles = np.sort(np.random.normal(numeric_prices.mean(), numeric_prices.std(), len(sorted_prices)))
+    prices = np.sort(np.asarray(pd.Series(numeric_prices).dropna()))
+    n = len(prices)
+    if n < 2:
+        return px.scatter(title="Not enough data for QQ plot")
+
+    percentiles = (np.arange(1, n + 1) - 0.5) / n
+    std_val = prices.std()
+    scale = std_val if std_val > 0 else 1.0
+    theoretical_quantiles = norm.ppf(percentiles, loc=prices.mean(), scale=scale)
     qq_df = pd.DataFrame({
         "Theoretical Quantiles": theoretical_quantiles,
-        "Sample Quantiles": sorted_prices
+        "Sample Quantiles": prices
     })
     fig = px.scatter(
         qq_df, 
@@ -29,12 +36,14 @@ def plot_qq_normality_check(numeric_prices):
         y="Sample Quantiles",
         hover_data=[qq_df.index]
     )
+    min_val = min(qq_df["Theoretical Quantiles"].min(), qq_df["Sample Quantiles"].min())
+    max_val = max(qq_df["Theoretical Quantiles"].max(), qq_df["Sample Quantiles"].max())
     fig.add_shape(
         type="line",
-        x0=qq_df["Theoretical Quantiles"].min(),
-        y0=qq_df["Theoretical Quantiles"].min(),
-        x1=qq_df["Theoretical Quantiles"].max(),
-        y1=qq_df["Theoretical Quantiles"].max(),
+        x0=min_val,
+        y0=min_val,
+        x1=max_val,
+        y1=max_val,
         line=dict(color="red", dash="dash")
     )
     fig.update_layout(xaxis_title="Theoretical Quantiles", yaxis_title="Sample Quantiles")
