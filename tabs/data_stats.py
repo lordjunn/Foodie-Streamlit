@@ -9,7 +9,7 @@ import plots
 def _highlight_change(val):
     if pd.isna(val):
         return ""
-    color = "green" if val > 0 else ("red" if val < 0 else "gray")
+    color = "red" if val > 0 else ("green" if val < 0 else "gray")
     return f"color: {color}; font-weight: bold;"
 
 
